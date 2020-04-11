@@ -2,7 +2,6 @@ package terminal
 
 import (
 	"fmt"
-	sys "golang.org/x/sys/unix"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -11,45 +10,39 @@ import (
 	"strings"
 
 	"go.uber.org/zap"
+	"golang.org/x/crypto/ssh/terminal"
+	sys "golang.org/x/sys/unix"
 )
 
 type Terminal struct {
-	originalTermios sys.Termios
-	winSize         sys.Winsize
-	renderedPaths   []string
-	cursorLine      int
-	in              *os.File
-	out             *os.File
-	loop            bool
+	originalState terminal.State
+	rows          int
+	cols          int
+	in            *os.File
+	out           *os.File
+	loop          bool
 }
 
 func OpenTerm() (*Terminal, error) {
-	termios, err := sys.IoctlGetTermios(1, sys.TIOCGETA)
-	if err != nil {
-		return nil, err
-	}
 	inFd, err := sys.Open("/dev/tty", sys.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
 	}
 	outFd, err := sys.Open("/dev/tty", sys.O_WRONLY, 0)
 	term := Terminal{
-		originalTermios: *termios,
-		in:              os.NewFile(uintptr(inFd), "/dev/tty"),
-		out:             os.NewFile(uintptr(outFd), "/dev/tty"),
+		in:  os.NewFile(uintptr(inFd), "/dev/tty"),
+		out: os.NewFile(uintptr(outFd), "/dev/tty"),
 	}
 
 	return &term, term.initTerm()
 }
 
 func (t *Terminal) initTerm() error {
-	termios := t.originalTermios
-	termios.Iflag &^= uint64(sys.IGNCR) | uint64(sys.INLCR) | uint64(sys.ICRNL)
-	termios.Lflag &^= uint64(sys.ECHO) | uint64(sys.ICANON)
-	if err := sys.IoctlSetTermios(1, sys.TIOCSETA, &termios); err != nil {
+	state, err := terminal.MakeRaw(int(t.out.Fd()))
+	if err != nil {
 		return err
 	}
-
+	t.originalState = *state
 	t.out.WriteString(enableAltBuf)
 	t.out.WriteString(hideCursor)
 	return nil
@@ -59,7 +52,7 @@ func (t *Terminal) revertTerm() {
 	t.out.WriteString(enableAltBuf)
 	t.out.WriteString(disableAltBuf)
 	t.out.WriteString(showCursor)
-	sys.IoctlSetTermios(1, sys.TIOCSETA, &t.originalTermios)
+	terminal.Restore(int(t.out.Fd()), &t.originalState)
 }
 
 func (t *Terminal) Close() {
@@ -92,7 +85,7 @@ func (t *Terminal) render(views []View) {
 			continue
 		}
 
-		p := view.Position(int(t.winSize.Row), int(t.winSize.Col))
+		p := view.Position(t.rows, t.cols)
 		if view.HasBorder() {
 			t.drawBorder(p)
 			p = p.Shrink(1)
@@ -112,11 +105,12 @@ func (t *Terminal) render(views []View) {
 }
 
 func (t *Terminal) fetchWinSize() error {
-	winSize, err := sys.IoctlGetWinsize(1, sys.TIOCGWINSZ)
+	width, height, err := terminal.GetSize(int(t.out.Fd()))
 	if err != nil {
 		return err
 	}
-	t.winSize = *winSize
+	t.rows = height
+	t.cols = width
 	return nil
 }
 
