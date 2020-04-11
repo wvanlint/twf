@@ -1,8 +1,11 @@
 package main
 
 import (
+	"fmt"
 	sys "golang.org/x/sys/unix"
+	"io/ioutil"
 	"os"
+	"os/exec"
 	"os/signal"
 	"sort"
 	"strings"
@@ -64,14 +67,20 @@ func InitTerm(callbacks Callbacks) (*Terminal, error) {
 	}
 	term := Terminal{originalTermios: *termios, callbacks: callbacks}
 
+	return &term, term.init()
+}
+
+func (t *Terminal) init() error {
+	termios := t.originalTermios
 	termios.Iflag &^= uint64(sys.IGNCR) | uint64(sys.INLCR) | uint64(sys.ICRNL)
 	termios.Lflag &^= uint64(sys.ECHO) | uint64(sys.ICANON)
-	sys.IoctlSetTermios(1, sys.TIOCSETA, termios)
+	if err := sys.IoctlSetTermios(1, sys.TIOCSETA, &termios); err != nil {
+		return err
+	}
 
 	os.Stdout.WriteString(escape + altbuf + high)
 	os.Stdout.WriteString(escape + cursor + low)
-
-	return &term, nil
+	return nil
 }
 
 func DefaultLayout() string {
@@ -136,10 +145,21 @@ func (t *Terminal) Close() {
 	sys.IoctlSetTermios(1, sys.TIOCSETA, &t.originalTermios)
 }
 
-func (t *Terminal) StartLoop(state *AppState, stop chan bool) {
+func (t *Terminal) StartLoop(state *AppState, stop chan bool) error {
 	sigs := make(chan os.Signal, 1)
 	done := make(chan bool, 1)
+	err := error(nil)
+	ok := false
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				err, ok = r.(error)
+				if !ok {
+					err = fmt.Errorf("Terminal: %v", r)
+				}
+			}
+			done <- true
+		}()
 		stopLoop := false
 		t.Render(state)
 		for {
@@ -160,6 +180,7 @@ func (t *Terminal) StartLoop(state *AppState, stop chan bool) {
 	}()
 	signal.Notify(sigs, sys.SIGINT, sys.SIGTERM)
 	<-done
+	return err
 }
 
 func (t *Terminal) ReadCommand(state *AppState) {
@@ -180,15 +201,30 @@ func (t *Terminal) ReadCommand(state *AppState) {
 			}
 		case 'q':
 			t.callbacks.Quit()
-		case 'l':
+		case 27:
+			t.callbacks.Quit()
+		case 'o':
 			t.callbacks.Toggle()
-		case 'L':
+		case 'O':
 			t.callbacks.ToggleAll()
-		case 'h':
+		case 'p':
 			t.callbacks.Up()
-		case 'H':
+		case 'P':
 			t.callbacks.Up()
 			t.callbacks.Close()
+		case '/':
+			tempF, _ := ioutil.TempFile("", "twf_")
+			fzf := exec.Command("bash", "-c", "fzf > "+tempF.Name())
+			fzf.Stdin = os.Stdin
+			fzf.Stdout = os.Stdout
+			fzf.Stderr = os.Stderr
+			t.Close()
+			fzf.Run()
+			t.init()
+			content, _ := ioutil.ReadAll(tempF)
+			tempF.Close()
+			os.Remove(tempF.Name())
+			t.callbacks.ChangeCursor(strings.TrimSpace(string(content)))
 		}
 	}
 }

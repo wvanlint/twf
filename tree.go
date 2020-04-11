@@ -101,10 +101,9 @@ func (t *Tree) Children() []*Tree {
 	return append(t.children[:0:0], t.children...)
 }
 
-func (t *Tree) GetPath(path string) *Tree {
+func (t *Tree) FindPath(path string) *Tree {
 	var err error
 	path = filepath.Clean(path)
-	Log.Println(path)
 	if path == t.Path {
 		return t
 	}
@@ -125,7 +124,7 @@ func (t *Tree) GetPath(path string) *Tree {
 		currentNode.maybeLoadChildren()
 		currentNode, ok = currentNode.childrenByName[part]
 		if !ok {
-			panic("Not found.")
+			panic("Not found: " + part)
 		}
 	}
 	return currentNode

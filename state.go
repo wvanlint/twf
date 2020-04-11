@@ -8,11 +8,16 @@ type AppState struct {
 }
 
 func (s *AppState) ChangeCursor(path string) {
-	s.Cursor = path
+	node := s.Root.FindPath(path)
+	s.Cursor = node.Path
+	for node != s.Root {
+		node = node.Parent()
+		s.SetExpansion(node.Path, true)
+	}
 }
 
-func (s *AppState) MoveCursorUp() {
-	parent := s.Root.GetPath(s.Cursor).Parent()
+func (s *AppState) MoveCursorToParent() {
+	parent := s.Root.FindPath(s.Cursor).Parent()
 	if parent != nil {
 		s.Cursor = parent.Path
 	}
@@ -32,7 +37,7 @@ func (s *AppState) ToggleExpansion(path string) {
 }
 
 func (s *AppState) SetExpansionAll(path string, value bool) {
-	tree := s.Root.GetPath(path)
+	tree := s.Root.FindPath(path)
 	tree.Traverse(func(node *Tree) {
 		s.SetExpansion(node.Path, value)
 	})

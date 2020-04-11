@@ -37,12 +37,15 @@ func main() {
 		ToggleAll:    func() { state.ToggleExpansionAll(state.Cursor) },
 		OpenAll:      func() { state.SetExpansionAll(state.Cursor, true) },
 		CloseAll:     func() { state.SetExpansionAll(state.Cursor, false) },
-		Up:           func() { state.MoveCursorUp() },
+		Up:           func() { state.MoveCursorToParent() },
 		Quit:         func() { stop <- true },
 	})
 	if err != nil {
 		panic(err)
 	}
 	defer t.Close()
-	t.StartLoop(&state, stop)
+	err = t.StartLoop(&state, stop)
+	if err != nil {
+		panic(err)
+	}
 }
