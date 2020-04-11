@@ -3,14 +3,16 @@ package main
 import (
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
 )
 
 type Tree struct {
-	Path       string
-	info       os.FileInfo
-	targetInfo os.FileInfo
-	children   []*Tree
+	Path           string
+	info           os.FileInfo
+	targetInfo     os.FileInfo
+	parent         *Tree
+	children       []*Tree
+	childrenByName map[string]*Tree
 }
 
 func InitTreeFromWd() (*Tree, error) {
@@ -55,36 +57,88 @@ func (t *Tree) IsDir() bool {
 	}
 }
 
-func (t *Tree) Children() ([]*Tree, error) {
+func (t *Tree) Parent() *Tree {
+	return t.parent
+}
+
+func (t *Tree) maybeLoadChildren() {
 	if t.children != nil {
-		return t.children, nil
+		return
 	}
+	t.children = []*Tree{}
+	t.childrenByName = map[string]*Tree{}
 	if !t.IsDir() {
-		return []*Tree{}, nil
+		return
 	}
 	f, err := os.Open(t.Path)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	contents, err := f.Readdir(0)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
 	for _, content := range contents {
 		childTree := &Tree{
-			Path: path.Join(t.Path, content.Name()),
-			info: content,
+			Path:   filepath.Join(t.Path, content.Name()),
+			info:   content,
+			parent: t,
 		}
 		if content.Mode()&os.ModeSymlink != 0 {
 			if targetInfo, err := os.Stat(childTree.Path); err == nil {
 				childTree.targetInfo = targetInfo
 			} else {
-				return nil, err
+				panic(err)
 			}
 		}
 		t.children = append(t.children, childTree)
+		t.childrenByName[childTree.Name()] = childTree
 	}
-	return append(t.children[:0:0], t.children...), nil
+}
+
+func (t *Tree) Children() []*Tree {
+	t.maybeLoadChildren()
+	return append(t.children[:0:0], t.children...)
+}
+
+func (t *Tree) GetPath(path string) *Tree {
+	var err error
+	path = filepath.Clean(path)
+	Log.Println(path)
+	if path == t.Path {
+		return t
+	}
+	if filepath.IsAbs(path) {
+		path, err = filepath.Rel(t.Path, path)
+		if err != nil {
+			panic("Not found.")
+		}
+	}
+	parts := []string{}
+	for base := filepath.Base(path); base != "."; base = filepath.Base(path) {
+		path = filepath.Dir(path)
+		parts = append([]string{base}, parts...)
+	}
+	currentNode := t
+	var ok bool
+	for _, part := range parts {
+		currentNode.maybeLoadChildren()
+		currentNode, ok = currentNode.childrenByName[part]
+		if !ok {
+			panic("Not found.")
+		}
+	}
+	return currentNode
+}
+
+func (t *Tree) Traverse(f func(*Tree)) {
+	queue := []*Tree{t}
+	var item *Tree
+	for len(queue) > 0 {
+		item, queue = queue[0], queue[1:]
+		f(item)
+		queue = append(queue, item.Children()...)
+	}
 }
 
 func ByTypeAndName(children []*Tree) func(i, j int) bool {
@@ -99,10 +153,7 @@ func ByTypeAndName(children []*Tree) func(i, j int) bool {
 
 func (t *Tree) Print(indent string) {
 	fmt.Println(indent + t.info.Name())
-	children, err := t.Children()
-	if err != nil {
-		panic(err)
-	}
+	children := t.Children()
 	for _, child := range children {
 		child.Print(indent + "  ")
 	}

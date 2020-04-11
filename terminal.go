@@ -39,9 +39,15 @@ const (
 )
 
 type Callbacks struct {
-	ChangeCursor    func(string)
-	ToggleExpansion func(string)
-	Quit            func()
+	ChangeCursor func(string)
+	Up           func()
+	Open         func()
+	Close        func()
+	OpenAll      func()
+	CloseAll     func()
+	Toggle       func()
+	ToggleAll    func()
+	Quit         func()
 }
 
 type Terminal struct {
@@ -58,8 +64,10 @@ func InitTerm(callbacks Callbacks) (*Terminal, error) {
 	}
 	term := Terminal{originalTermios: *termios, callbacks: callbacks}
 
-	termios.Lflag = termios.Lflag & (^uint64(sys.ECHO) & ^uint64(sys.ICANON))
+	termios.Iflag &^= uint64(sys.IGNCR) | uint64(sys.INLCR) | uint64(sys.ICRNL)
+	termios.Lflag &^= uint64(sys.ECHO) | uint64(sys.ICANON)
 	sys.IoctlSetTermios(1, sys.TIOCSETA, termios)
+
 	os.Stdout.WriteString(escape + altbuf + high)
 	os.Stdout.WriteString(escape + cursor + low)
 
@@ -109,7 +117,7 @@ func (t *Terminal) Render(state *AppState) {
 		}
 
 		if value, _ := state.Expansions[item.tree.Path]; value {
-			children, _ := item.tree.Children()
+			children := item.tree.Children()
 			sort.Slice(children, ByTypeAndName(children))
 			for i := len(children) - 1; i >= 0; i-- {
 				stack = append(stack, Item{children[i], item.depth + 1})
@@ -155,9 +163,10 @@ func (t *Terminal) StartLoop(state *AppState, stop chan bool) {
 }
 
 func (t *Terminal) ReadCommand(state *AppState) {
-	input := make([]byte, 1)
-	_, err := os.Stdout.Read(input)
+	input := make([]byte, 128)
+	n, err := sys.Read(1, input)
 	if err == nil {
+		Log.Println(input[:n])
 		switch input[0] {
 		case 'j':
 			nextCursorLine := t.cursorLine + 1
@@ -171,8 +180,15 @@ func (t *Terminal) ReadCommand(state *AppState) {
 			}
 		case 'q':
 			t.callbacks.Quit()
-		case 10:
-			t.callbacks.ToggleExpansion(state.Cursor)
+		case 'l':
+			t.callbacks.Toggle()
+		case 'L':
+			t.callbacks.ToggleAll()
+		case 'h':
+			t.callbacks.Up()
+		case 'H':
+			t.callbacks.Up()
+			t.callbacks.Close()
 		}
 	}
 }
