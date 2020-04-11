@@ -3,7 +3,7 @@ package main
 type AppState struct {
 	Root       *Tree
 	Cursor     string
-	ScrollTop  int
+	Scroll     int
 	Expansions map[string]bool
 }
 
@@ -46,4 +46,8 @@ func (s *AppState) SetExpansionAll(path string, value bool) {
 func (s *AppState) ToggleExpansionAll(path string) {
 	value, _ := s.Expansions[path]
 	s.SetExpansionAll(path, !value)
+}
+
+func (s *AppState) ChangeScroll(i int) {
+	s.Scroll = i
 }

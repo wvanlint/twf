@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math"
 	"sort"
 	"strings"
 
@@ -8,21 +9,45 @@ import (
 )
 
 type TreeView struct {
-	state         *AppState
-	renderedPaths []string
-	cursorLine    int
+	state        *AppState
+	pathsByIndex map[string]int
+	paths        []string
+	cursorLine   int
+	rows         int
 }
 
-func (tv *TreeView) Dims() (float32, float32) {
-	return 1.0, 1.0
+func (tv *TreeView) Position(totalRows int, totalCols int) term.Position {
+	if tv.state.Root.FindPath(tv.state.Cursor).IsDir() {
+		return term.Position{
+			Top:  1,
+			Left: 1,
+			Rows: totalRows - 1,
+			Cols: totalCols,
+		}
+	} else {
+		return term.Position{
+			Top:  1,
+			Left: 1,
+			Rows: totalRows - 1,
+			Cols: int(math.Ceil(float64(totalCols) / 2.0)),
+		}
+	}
 }
 
 func (tv *TreeView) HasBorder() bool {
 	return false
 }
 
-func (tv *TreeView) renderNode(node *Tree, indentation int, selected bool) term.Line {
-	line := term.NewLine(&term.Graphics{})
+func (tv *TreeView) ShouldRender() bool {
+	return true
+}
+
+func (tv *TreeView) renderNode(
+	node *Tree,
+	indentation int,
+	maxLength int,
+) term.Line {
+	line := term.NewLine(&term.Graphics{}, maxLength)
 	line.Append(strings.Repeat("  ", indentation), nil)
 
 	graphics := term.Graphics{}
@@ -30,16 +55,18 @@ func (tv *TreeView) renderNode(node *Tree, indentation int, selected bool) term.
 		graphics.FgColor, _ = term.ColorFromString("brightblue")
 		graphics.Bold = true
 	}
-	if selected {
+	if node.Path == tv.state.Cursor {
 		graphics.Reverse = true
 	}
 	line.Append(node.info.Name(), &graphics)
 	return line
 }
 
-func (tv *TreeView) Render() ([]term.Line, bool) {
+func (tv *TreeView) Render(p term.Position) []term.Line {
 	lines := []term.Line{}
-	tv.renderedPaths = []string{}
+	tv.rows = p.Rows
+	tv.pathsByIndex = make(map[string]int)
+	tv.paths = []string{}
 	type Item struct {
 		tree  *Tree
 		depth int
@@ -48,13 +75,13 @@ func (tv *TreeView) Render() ([]term.Line, bool) {
 	for len(stack) > 0 {
 		var item Item
 		item, stack = stack[len(stack)-1], stack[:len(stack)-1]
-		line := tv.renderNode(item.tree, item.depth, item.tree.Path == tv.state.Cursor)
-		tv.renderedPaths = append(tv.renderedPaths, item.tree.Path)
-		lines = append(lines, line)
-
+		line := tv.renderNode(item.tree, item.depth, p.Cols)
+		tv.pathsByIndex[item.tree.Path] = len(lines)
+		tv.paths = append(tv.paths, item.tree.Path)
 		if item.tree.Path == tv.state.Cursor {
-			tv.cursorLine = len(lines) - 1
+			tv.cursorLine = len(lines)
 		}
+		lines = append(lines, line)
 
 		if value, _ := tv.state.Expansions[item.tree.Path]; value {
 			children := item.tree.Children()
@@ -64,21 +91,32 @@ func (tv *TreeView) Render() ([]term.Line, bool) {
 			}
 		}
 	}
-	return lines, true
+	return lines[tv.state.Scroll:]
 }
 
 func (tv *TreeView) GetNextPath() string {
-	if tv.cursorLine == len(tv.renderedPaths)-1 {
-		return tv.renderedPaths[len(tv.renderedPaths)-1]
+	if tv.cursorLine == len(tv.paths)-1 {
+		return tv.paths[len(tv.paths)-1]
 	} else {
-		return tv.renderedPaths[tv.cursorLine+1]
+		return tv.paths[tv.cursorLine+1]
 	}
 }
 
 func (tv *TreeView) GetPrevPath() string {
 	if tv.cursorLine == 0 {
-		return tv.renderedPaths[0]
+		return tv.paths[0]
 	} else {
-		return tv.renderedPaths[tv.cursorLine-1]
+		return tv.paths[tv.cursorLine-1]
+	}
+}
+
+func (tv *TreeView) ScrollForPath(path string) int {
+	targetLine := tv.pathsByIndex[path]
+	if targetLine < tv.state.Scroll {
+		return targetLine
+	} else if targetLine >= tv.state.Scroll+tv.rows {
+		return targetLine - tv.rows + 1
+	} else {
+		return tv.state.Scroll
 	}
 }
