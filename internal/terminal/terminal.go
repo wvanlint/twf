@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"runtime/debug"
 	"strings"
+	//	"time"
 
 	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh/terminal"
@@ -15,14 +16,15 @@ import (
 )
 
 type Terminal struct {
-	config        *TerminalConfig
-	originalState terminal.State
-	rows          int
-	cols          int
-	in            *os.File
-	out           *os.File
-	loop          bool
-	currentRow    int
+	config         *TerminalConfig
+	originalState  terminal.State
+	previousRender map[string]bool
+	rows           int
+	cols           int
+	in             *os.File
+	out            *os.File
+	loop           bool
+	currentRow     int
 }
 
 type TerminalConfig struct {
@@ -65,6 +67,7 @@ func (t *Terminal) revertTerm() {
 		t.out.WriteString(enableAltBuf)
 		t.out.WriteString(disableAltBuf)
 	}
+	t.previousRender = map[string]bool{}
 	t.out.WriteString(enableWrap)
 	t.out.WriteString(showCursor)
 	terminal.Restore(int(t.out.Fd()), &t.originalState)
@@ -77,37 +80,44 @@ func (t *Terminal) Close() {
 	t.out.Close()
 }
 
-func (t *Terminal) moveTo(row int, col int) {
-	t.out.WriteString(cursorBack(t.cols))
+func (t *Terminal) position(row int, col int) string {
+	out := &strings.Builder{}
+	out.WriteString(cursorBack(t.cols))
 	vertical := row - t.currentRow
 	if vertical > 0 {
-		t.out.WriteString(cursorDown(vertical))
+		out.WriteString(cursorDown(vertical))
 	} else if vertical < 0 {
-		t.out.WriteString(cursorUp(-vertical))
+		out.WriteString(cursorUp(-vertical))
 	}
-	t.out.WriteString(cursorForward(col - 1))
+	out.WriteString(cursorForward(col - 1))
 	t.currentRow = row
+	return out.String()
 }
 
-func (t *Terminal) drawBorder(p Position) {
+func (t *Terminal) border(p Position) string {
 	if p.Rows < 2 || p.Cols < 2 {
-		return
+		return ""
 	}
-	t.moveTo(p.Top, p.Left)
-	t.out.WriteString("┌" + strings.Repeat("─", p.Cols-2) + "┐")
+	out := &strings.Builder{}
+	out.WriteString(t.position(p.Top, p.Left))
+	out.WriteString("┌" + strings.Repeat("─", p.Cols-2) + "┐")
 	for i := 1; i < p.Rows-1; i++ {
-		t.moveTo(p.Top+i, p.Left+p.Cols-1)
-		t.out.WriteString("│")
+		out.WriteString(t.position(p.Top+i, p.Left+p.Cols-1))
+		out.WriteString("│")
 	}
 	for i := 1; i < p.Rows-1; i++ {
-		t.moveTo(p.Top+i, p.Left)
-		t.out.WriteString("│")
+		out.WriteString(t.position(p.Top+i, p.Left))
+		out.WriteString("│")
 	}
-	t.moveTo(p.Top+p.Rows-1, p.Left)
-	t.out.WriteString("└" + strings.Repeat("─", p.Cols-2) + "┘")
+	out.WriteString(t.position(p.Top+p.Rows-1, p.Left))
+	out.WriteString("└" + strings.Repeat("─", p.Cols-2) + "┘")
+	out.WriteString(t.position(1, 1))
+	return out.String()
 }
 
 func (t *Terminal) render(views []View) {
+	out := &strings.Builder{}
+	newRender := map[string]bool{}
 	for _, view := range views {
 		if !view.ShouldRender() {
 			continue
@@ -115,28 +125,40 @@ func (t *Terminal) render(views []View) {
 
 		p := view.Position(t.rows, t.cols)
 		if view.HasBorder() {
-			t.drawBorder(p)
+			s := t.border(p)
+			if _, ok := t.previousRender[s]; !ok {
+				out.WriteString(s)
+			}
+			newRender[s] = true
 			p = p.Shrink(1)
 		}
 
 		lines := view.Render(p)
 		for row := 0; row < p.Rows; row++ {
-			t.moveTo(p.Top+row, p.Left)
+			lineRender := &strings.Builder{}
+			lineRender.WriteString(t.position(p.Top+row, p.Left))
 			if row < len(lines) {
-				t.out.WriteString(lines[row].Text())
+				lineRender.WriteString(lines[row].Text())
 				if p.Cols > lines[row].Length() {
-					t.out.WriteString(strings.Repeat(" ", p.Cols-lines[row].Length()))
+					lineRender.WriteString(strings.Repeat(" ", p.Cols-lines[row].Length()))
 				}
 			} else {
-				t.out.WriteString(strings.Repeat(" ", p.Cols))
+				lineRender.WriteString(strings.Repeat(" ", p.Cols))
 			}
-			if p.Top+row < t.rows {
-				t.out.WriteString("\n")
-				t.currentRow += 1
+			lineRender.WriteString(t.position(1, 1))
+			if _, ok := t.previousRender[lineRender.String()]; !ok {
+				out.WriteString(lineRender.String())
 			}
-			t.moveTo(1, 1)
+			newRender[lineRender.String()] = true
+			//if p.Top+row < t.rows {
+			//	out.WriteString("\n")
+			//	t.currentRow += 1
+			//}
+			//t.moveTo(out, 1, 1)
 		}
 	}
+	t.out.WriteString(out.String())
+	t.previousRender = newRender
 }
 
 func (t *Terminal) fetchWinSize() error {
@@ -163,8 +185,8 @@ func (t *Terminal) StartLoop(bindings map[string][]string, views []View) (err er
 	signal.Notify(winChSig, sys.SIGWINCH)
 
 	events := make(chan Event)
-	eventReadDone := make(chan bool)
-	go readEvents(t.in, events, eventReadDone)
+	nextEvents := make(chan bool)
+	go readEvents(t.in, events, nextEvents)
 
 	err = t.fetchWinSize()
 	if err != nil {
@@ -182,8 +204,6 @@ func (t *Terminal) StartLoop(bindings map[string][]string, views []View) (err er
 			t.fetchWinSize()
 			t.render(views)
 			zap.L().Debug("Rerendered.")
-		case <-eventReadDone:
-			go readEvents(t.in, events, eventReadDone)
 		case event := <-events:
 			zap.L().Sugar().Debug("Event: ", event)
 			cmdKeys, ok := bindings[event.HashKey()]
@@ -203,7 +223,9 @@ func (t *Terminal) StartLoop(bindings map[string][]string, views []View) (err er
 					}
 				}
 			}
+			nextEvents <- true
 			t.render(views)
+			//time.Sleep(10 * time.Millisecond)
 		}
 		if !t.loop {
 			break

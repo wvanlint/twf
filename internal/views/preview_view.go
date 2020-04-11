@@ -14,7 +14,8 @@ import (
 type previewView struct {
 	config      *config.TwfConfig
 	state       *state.State
-	lastPreview string
+	lastPath    string
+	lastPreview []string
 	scroll      int
 	noLines     int
 }
@@ -45,16 +46,19 @@ func (v *previewView) ShouldRender() bool {
 }
 
 func (v *previewView) Render(p term.Position) []term.Line {
-	if v.lastPreview != v.state.Cursor {
-		v.lastPreview = v.state.Cursor
+	if v.lastPath != v.state.Cursor {
+		v.lastPath = v.state.Cursor
 		v.scroll = 0
+
+		preview, err := getPreview(v.config.Preview.PreviewCommand, v.state.Cursor)
+		preview = strings.ReplaceAll(preview, "\t", "    ")
+		if err != nil {
+			panic(err)
+		}
+		v.lastPreview = strings.Split(preview, "\n")
 	}
-	output, err := getPreview(v.config.Preview.PreviewCommand, v.state.Cursor)
-	output = strings.ReplaceAll(output, "\t", "    ")
-	if err != nil {
-		panic(err)
-	}
-	lines := strings.Split(output, "\n")
+
+	lines := v.lastPreview
 	if v.scroll > len(lines)-p.Rows {
 		if len(lines) < p.Rows {
 			v.scroll = 0

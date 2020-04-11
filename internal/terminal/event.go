@@ -97,61 +97,64 @@ func hasPrefix(s []byte, prefix []byte) bool {
 	return true
 }
 
-func readEvents(r io.Reader, out chan Event, done chan bool) {
-	defer func() { done <- true }()
-	in := make([]byte, 128)
-	n, err := r.Read(in)
-	if err != nil {
-		return
-	}
-	in = in[:n]
-	zap.L().Sugar().Debug("Input bytes: ", in)
-
-	for len(in) > 0 {
-		if in[0] == Escape {
-			// Literal escape or escape sequences.
-			switch {
-			case in[0] == Escape && (len(in) == 1 || in[1] == Escape):
-				out <- Event{Symbol: Escape}
-				in = in[1:]
-			case hasPrefix(in, []byte{27, 91, 65}):
-				out <- Event{Symbol: Up}
-				in = in[3:]
-			case hasPrefix(in, []byte{27, 91, 66}):
-				out <- Event{Symbol: Down}
-				in = in[3:]
-			case hasPrefix(in, []byte{27, 91, 67}):
-				out <- Event{Symbol: Right}
-				in = in[3:]
-			case hasPrefix(in, []byte{27, 91, 68}):
-				out <- Event{Symbol: Left}
-				in = in[3:]
-			case hasPrefix(in, []byte{27, 91, 49, 126}):
-				out <- Event{Symbol: Home}
-				in = in[4:]
-			case hasPrefix(in, []byte{27, 91, 52, 126}):
-				out <- Event{Symbol: End}
-				in = in[4:]
-			default:
-				// Unhandled entries.
-				in = in[0:0]
-			}
-		} else {
-			r, rSize := utf8.DecodeRune(in)
-			switch {
-			case in[0] <= 31:
-				out <- Event{Symbol: EventSymbol(in[0])}
-				in = in[1:]
-			case in[0] == Del:
-				out <- Event{Symbol: Del}
-				in = in[1:]
-			case r != utf8.RuneError:
-				out <- Event{Symbol: Rune, Value: r}
-				in = in[rSize:]
-			default:
-				// Unhandled entries.
-				in = in[0:0]
-			}
+func readEvents(r io.Reader, out chan Event, next chan bool) {
+	for {
+		in := make([]byte, 128)
+		n, err := r.Read(in)
+		if err != nil {
+			return
 		}
+		in = in[:n]
+		zap.L().Sugar().Debug("Input bytes: ", in)
+
+		for len(in) > 0 {
+			if in[0] == Escape {
+				// Literal escape or escape sequences.
+				switch {
+				case in[0] == Escape && (len(in) == 1 || in[1] == Escape):
+					out <- Event{Symbol: Escape}
+					in = in[1:]
+				case hasPrefix(in, []byte{27, 91, 65}):
+					out <- Event{Symbol: Up}
+					in = in[3:]
+				case hasPrefix(in, []byte{27, 91, 66}):
+					out <- Event{Symbol: Down}
+					in = in[3:]
+				case hasPrefix(in, []byte{27, 91, 67}):
+					out <- Event{Symbol: Right}
+					in = in[3:]
+				case hasPrefix(in, []byte{27, 91, 68}):
+					out <- Event{Symbol: Left}
+					in = in[3:]
+				case hasPrefix(in, []byte{27, 91, 49, 126}):
+					out <- Event{Symbol: Home}
+					in = in[4:]
+				case hasPrefix(in, []byte{27, 91, 52, 126}):
+					out <- Event{Symbol: End}
+					in = in[4:]
+				default:
+					// Unhandled entries.
+					in = in[0:0]
+				}
+			} else {
+				r, rSize := utf8.DecodeRune(in)
+				switch {
+				case in[0] <= 31:
+					out <- Event{Symbol: EventSymbol(in[0])}
+					in = in[1:]
+				case in[0] == Del:
+					out <- Event{Symbol: Del}
+					in = in[1:]
+				case r != utf8.RuneError:
+					out <- Event{Symbol: Rune, Value: r}
+					in = in[rSize:]
+				default:
+					// Unhandled entries.
+					in = in[0:0]
+				}
+			}
+			in = in[0:0] // Don't queue commands.
+		}
+		<-next
 	}
 }
