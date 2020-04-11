@@ -12,9 +12,12 @@ const (
 	disableAltBuf = csi + "?1049l"
 	showCursor    = csi + "?25h"
 	hideCursor    = csi + "?25l"
+	enableWrap    = csi + "?7h"
+	disableWrap   = csi + "?7l"
 
-	eraseTermAll = csi + "2J"
-	eraseLineAll = csi + "2K"
+	eraseDisplayEnd = csi + "0J"
+	eraseDisplayAll = csi + "2J"
+	eraseLineAll    = csi + "2K"
 
 	resetGraphics = csi + "m"
 
@@ -31,6 +34,9 @@ func cursorUp(args ...int) string {
 	if len(args) > 0 {
 		i = args[0]
 	}
+	if i == 0 {
+		return ""
+	}
 	return fmt.Sprint(csi, i, "A")
 }
 
@@ -38,6 +44,9 @@ func cursorDown(args ...int) string {
 	i := 1
 	if len(args) > 0 {
 		i = args[0]
+	}
+	if i == 0 {
+		return ""
 	}
 	return fmt.Sprint(csi, i, "B")
 }
@@ -47,6 +56,9 @@ func cursorForward(args ...int) string {
 	if len(args) > 0 {
 		i = args[0]
 	}
+	if i == 0 {
+		return ""
+	}
 	return fmt.Sprint(csi, i, "C")
 }
 
@@ -54,6 +66,9 @@ func cursorBack(args ...int) string {
 	i := 1
 	if len(args) > 0 {
 		i = args[0]
+	}
+	if i == 0 {
+		return ""
 	}
 	return fmt.Sprint(csi, i, "D")
 }

@@ -20,7 +20,6 @@ func InitTreeFromWd() (*Tree, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println(wd)
 	tree, err := InitTree(wd)
 	if err != nil {
 		return nil, err

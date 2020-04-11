@@ -7,6 +7,7 @@ import (
 type TwfConfig struct {
 	Preview  PreviewConfig
 	TreeView TreeViewConfig
+	Terminal term.TerminalConfig
 }
 
 type PreviewConfig struct {
@@ -35,7 +36,11 @@ var defaultConfig = TwfConfig{
 		FindCommand: "fzf",
 	},
 	Preview: PreviewConfig{
-		PreviewCommand: "cat {}",
+		Enabled:        true,
+		PreviewCommand: "bat {}",
+	},
+	Terminal: term.TerminalConfig{
+		Height: 0.2,
 	},
 }
 

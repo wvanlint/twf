@@ -15,23 +15,31 @@ import (
 )
 
 type Terminal struct {
+	config        *TerminalConfig
 	originalState terminal.State
 	rows          int
 	cols          int
 	in            *os.File
 	out           *os.File
 	loop          bool
+	currentRow    int
 }
 
-func OpenTerm() (*Terminal, error) {
+type TerminalConfig struct {
+	Height float32
+}
+
+func OpenTerm(config *TerminalConfig) (*Terminal, error) {
 	inFd, err := sys.Open("/dev/tty", sys.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
 	}
 	outFd, err := sys.Open("/dev/tty", sys.O_WRONLY, 0)
 	term := Terminal{
-		in:  os.NewFile(uintptr(inFd), "/dev/tty"),
-		out: os.NewFile(uintptr(outFd), "/dev/tty"),
+		config:     config,
+		in:         os.NewFile(uintptr(inFd), "/dev/tty"),
+		out:        os.NewFile(uintptr(outFd), "/dev/tty"),
+		currentRow: 1,
 	}
 
 	return &term, term.initTerm()
@@ -43,39 +51,59 @@ func (t *Terminal) initTerm() error {
 		return err
 	}
 	t.originalState = *state
-	t.out.WriteString(enableAltBuf)
+	if t.config.Height == 1.0 {
+		t.out.WriteString(enableAltBuf)
+		t.out.WriteString(cursorPosition(1, 1))
+	}
+	t.out.WriteString(disableWrap)
 	t.out.WriteString(hideCursor)
 	return nil
 }
 
 func (t *Terminal) revertTerm() {
-	t.out.WriteString(enableAltBuf)
-	t.out.WriteString(disableAltBuf)
+	if t.config.Height == 1.0 {
+		t.out.WriteString(enableAltBuf)
+		t.out.WriteString(disableAltBuf)
+	}
+	t.out.WriteString(enableWrap)
 	t.out.WriteString(showCursor)
 	terminal.Restore(int(t.out.Fd()), &t.originalState)
 }
 
 func (t *Terminal) Close() {
+	t.out.WriteString(eraseDisplayEnd)
 	t.revertTerm()
 	t.in.Close()
 	t.out.Close()
+}
+
+func (t *Terminal) moveTo(row int, col int) {
+	t.out.WriteString(cursorBack(t.cols))
+	vertical := row - t.currentRow
+	if vertical > 0 {
+		t.out.WriteString(cursorDown(vertical))
+	} else if vertical < 0 {
+		t.out.WriteString(cursorUp(-vertical))
+	}
+	t.out.WriteString(cursorForward(col - 1))
+	t.currentRow = row
 }
 
 func (t *Terminal) drawBorder(p Position) {
 	if p.Rows < 2 || p.Cols < 2 {
 		return
 	}
-	t.out.WriteString(cursorPosition(p.Top, p.Left))
+	t.moveTo(p.Top, p.Left)
 	t.out.WriteString("┌" + strings.Repeat("─", p.Cols-2) + "┐")
 	for i := 1; i < p.Rows-1; i++ {
-		t.out.WriteString(cursorPosition(p.Top+i, p.Left+p.Cols-1))
+		t.moveTo(p.Top+i, p.Left+p.Cols-1)
 		t.out.WriteString("│")
 	}
 	for i := 1; i < p.Rows-1; i++ {
-		t.out.WriteString(cursorPosition(p.Top+i, p.Left))
+		t.moveTo(p.Top+i, p.Left)
 		t.out.WriteString("│")
 	}
-	t.out.WriteString(cursorPosition(p.Top+p.Rows-1, p.Left))
+	t.moveTo(p.Top+p.Rows-1, p.Left)
 	t.out.WriteString("└" + strings.Repeat("─", p.Cols-2) + "┘")
 }
 
@@ -93,13 +121,18 @@ func (t *Terminal) render(views []View) {
 
 		lines := view.Render(p)
 		for row := 0; row < p.Rows; row++ {
-			t.out.WriteString(cursorPosition(p.Top+row, p.Left))
+			t.moveTo(p.Top+row, p.Left)
 			if row < len(lines) {
 				t.out.WriteString(lines[row].Text())
 				t.out.WriteString(strings.Repeat(" ", p.Cols-lines[row].Length()))
 			} else {
 				t.out.WriteString(strings.Repeat(" ", p.Cols))
 			}
+			if p.Top+row < t.rows {
+				t.out.WriteString("\n")
+				t.currentRow += 1
+			}
+			t.moveTo(1, 1)
 		}
 	}
 }
@@ -109,7 +142,7 @@ func (t *Terminal) fetchWinSize() error {
 	if err != nil {
 		return err
 	}
-	t.rows = height
+	t.rows = int(float32(height) * t.config.Height)
 	t.cols = width
 	return nil
 }

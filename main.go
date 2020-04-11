@@ -51,7 +51,7 @@ func main() {
 		(&terminal.Event{terminal.Rune, 'q'}).HashKey(): "quit",
 	}
 
-	t, err := terminal.OpenTerm()
+	t, err := terminal.OpenTerm(&config.Terminal)
 	if err != nil {
 		panic(err)
 	}
