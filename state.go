@@ -5,6 +5,7 @@ type AppState struct {
 	Cursor     string
 	Scroll     int
 	Expansions map[string]bool
+	Selection  []string
 }
 
 func (s *AppState) ChangeCursor(path string) {
@@ -50,4 +51,8 @@ func (s *AppState) ToggleExpansionAll(path string) {
 
 func (s *AppState) ChangeScroll(i int) {
 	s.Scroll = i
+}
+
+func (s *AppState) AddSelection(path string) {
+	s.Selection = append(s.Selection, path)
 }

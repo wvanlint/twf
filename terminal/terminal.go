@@ -147,7 +147,7 @@ func (t *Terminal) fetchWinSize() error {
 	return nil
 }
 
-func (t *Terminal) StartLoop(bindings map[string]string, views []View) (err error) {
+func (t *Terminal) StartLoop(bindings map[string][]string, views []View) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Terminal: %v, stacktrace: %s", r, string(debug.Stack()))
@@ -180,7 +180,13 @@ func (t *Terminal) StartLoop(bindings map[string]string, views []View) (err erro
 			t.render(views)
 			zap.L().Debug("Rerendered.")
 		case event := <-events:
-			if cmdKey, ok := bindings[event.HashKey()]; ok {
+			zap.L().Sugar().Debug("Event: ", event)
+			cmdKeys, ok := bindings[event.HashKey()]
+			zap.L().Sugar().Debug("Cmds: ", cmdKeys)
+			if !ok {
+				continue
+			}
+			for _, cmdKey := range cmdKeys {
 				if cmd, ok := t.getCommands()[cmdKey]; ok {
 					cmd(t)
 				} else {
@@ -191,8 +197,8 @@ func (t *Terminal) StartLoop(bindings map[string]string, views []View) (err erro
 						}
 					}
 				}
-				t.render(views)
 			}
+			t.render(views)
 		}
 		if !t.loop {
 			break

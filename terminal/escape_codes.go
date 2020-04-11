@@ -136,3 +136,14 @@ func (g *Graphics) ToEscapeCode() string {
 
 	return csi + strings.Join(codes, ";") + "m"
 }
+
+func (g *Graphics) Merge(other *Graphics) {
+	if g.FgColor == nil {
+		g.FgColor = other.FgColor
+	}
+	if g.BgColor == nil {
+		g.BgColor = other.BgColor
+	}
+	g.Bold = g.Bold || other.Bold
+	g.Reverse = g.Reverse || other.Reverse
+}

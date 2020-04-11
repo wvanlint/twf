@@ -61,11 +61,16 @@ func (v *treeView) renderNode(
 
 	graphics := term.Graphics{}
 	if node.IsDir() {
-		graphics = v.config.TreeView.Graphics["dir"]
+		if g, ok := v.config.TreeView.Graphics["dir"]; ok {
+			graphics.Merge(&g)
+		}
 	}
 	if node.Path == v.state.Cursor {
-		graphics = v.config.TreeView.Graphics["cursor"]
+		if g, ok := v.config.TreeView.Graphics["cursor"]; ok {
+			graphics.Merge(&g)
+		}
 	}
+
 	line.Append(node.info.Name(), &graphics)
 	return line
 }
@@ -141,7 +146,12 @@ func (v *treeView) GetCommands() map[string]term.Command {
 		"tree:closeAll":     v.closeAll,
 		"tree:parent":       v.parent,
 		"tree:findExternal": v.findExternal,
+		"tree:selectPath":   v.selectPath,
 	}
+}
+
+func (v *treeView) selectPath(helper term.TerminalHelper, args ...interface{}) {
+	v.state.AddSelection(v.state.Cursor)
 }
 
 func (v *treeView) prev(helper term.TerminalHelper, args ...interface{}) {

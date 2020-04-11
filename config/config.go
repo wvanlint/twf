@@ -5,9 +5,10 @@ import (
 )
 
 type TwfConfig struct {
-	Preview  PreviewConfig
-	TreeView TreeViewConfig
-	Terminal term.TerminalConfig
+	Preview     PreviewConfig
+	TreeView    TreeViewConfig
+	Terminal    term.TerminalConfig
+	KeyBindings KeyBindings
 }
 
 type PreviewConfig struct {
@@ -21,6 +22,7 @@ type TreeViewConfig struct {
 }
 
 type GraphicsConfig map[string]term.Graphics
+type KeyBindings map[string][]string
 
 var defaultConfig = TwfConfig{
 	TreeView: TreeViewConfig{
@@ -41,6 +43,15 @@ var defaultConfig = TwfConfig{
 	},
 	Terminal: term.TerminalConfig{
 		Height: 0.2,
+	},
+	KeyBindings: map[string][]string{
+		(&term.Event{term.Rune, 'j'}).HashKey():     []string{"tree:next"},
+		(&term.Event{term.Rune, 'k'}).HashKey():     []string{"tree:prev"},
+		(&term.Event{term.Rune, 'o'}).HashKey():     []string{"tree:toggle"},
+		(&term.Event{term.Rune, 'O'}).HashKey():     []string{"tree:toggleAll"},
+		(&term.Event{term.Rune, '/'}).HashKey():     []string{"tree:findExternal"},
+		(&term.Event{term.Rune, 'q'}).HashKey():     []string{"quit"},
+		(&term.Event{Symbol: term.Enter}).HashKey(): []string{"tree:selectPath", "quit"},
 	},
 }
 

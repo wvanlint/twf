@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"unicode/utf8"
+
+	"go.uber.org/zap"
 )
 
 const (
@@ -17,6 +19,7 @@ const (
 	CtrlF
 	CtrlG
 	CtrlH
+	CtrlI
 	CtrlJ
 	CtrlK
 	CtrlL
@@ -56,8 +59,9 @@ const (
 )
 
 const (
-	Tab = CtrlL
-	Del = 127
+	Tab   = CtrlI
+	Enter = CtrlM
+	Del   = 127
 )
 
 type EventSymbol int
@@ -97,6 +101,8 @@ func sendEventsLoop(r io.Reader, out chan Event) {
 			continue
 		}
 		in = in[:n]
+		zap.L().Sugar().Debug("Input bytes: ", in)
+
 		switch {
 		case len(in) == 1 && in[0] <= 31:
 			out <- Event{Symbol: EventSymbol(in[0])}

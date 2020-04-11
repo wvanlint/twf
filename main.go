@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/wvanlint/twf/config"
 	"github.com/wvanlint/twf/terminal"
 	"go.uber.org/zap"
@@ -8,6 +11,8 @@ import (
 )
 
 func main() {
+	config := config.GetConfig()
+
 	logger, err := zap.Config{
 		Level:       zap.NewAtomicLevelAt(zap.DebugLevel),
 		Encoding:    "console",
@@ -25,9 +30,8 @@ func main() {
 	}
 	defer logger.Sync()
 	zap.ReplaceGlobals(logger)
-	zap.L().Info("Starting twf.")
 
-	config := config.GetConfig()
+	zap.L().Info("Starting twf.")
 	tree, err := InitTreeFromWd()
 	if err != nil {
 		panic(err)
@@ -42,23 +46,17 @@ func main() {
 		NewPreviewView(config, &state),
 		NewStatusView(config, &state),
 	}
-	bindings := map[string]string{
-		(&terminal.Event{terminal.Rune, 'j'}).HashKey(): "tree:next",
-		(&terminal.Event{terminal.Rune, 'k'}).HashKey(): "tree:prev",
-		(&terminal.Event{terminal.Rune, 'o'}).HashKey(): "tree:toggle",
-		(&terminal.Event{terminal.Rune, 'O'}).HashKey(): "tree:toggleAll",
-		(&terminal.Event{terminal.Rune, '/'}).HashKey(): "tree:findExternal",
-		(&terminal.Event{terminal.Rune, 'q'}).HashKey(): "quit",
-	}
 
 	t, err := terminal.OpenTerm(&config.Terminal)
 	if err != nil {
 		panic(err)
 	}
-	defer t.Close()
-	err = t.StartLoop(bindings, views)
+	err = t.StartLoop(config.KeyBindings, views)
 	if err != nil {
 		panic(err)
 	}
+	t.Close()
+
+	fmt.Println(strings.Join(state.Selection, "\n"))
 	zap.L().Info("Stopping twf.")
 }
