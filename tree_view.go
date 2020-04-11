@@ -61,13 +61,13 @@ func (v *treeView) renderNode(
 
 	graphics := term.Graphics{}
 	if node.IsDir() {
-		if g, ok := v.config.TreeView.Graphics["dir"]; ok {
-			graphics.Merge(&g)
+		if g, ok := v.config.Graphics["tree:dir"]; ok {
+			graphics.Merge(g)
 		}
 	}
 	if node.Path == v.state.Cursor {
-		if g, ok := v.config.TreeView.Graphics["cursor"]; ok {
-			graphics.Merge(&g)
+		if g, ok := v.config.Graphics["tree:cursor"]; ok {
+			graphics.Merge(g)
 		}
 	}
 

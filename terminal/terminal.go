@@ -26,7 +26,7 @@ type Terminal struct {
 }
 
 type TerminalConfig struct {
-	Height float32
+	Height float64
 }
 
 func OpenTerm(config *TerminalConfig) (*Terminal, error) {
@@ -142,7 +142,7 @@ func (t *Terminal) fetchWinSize() error {
 	if err != nil {
 		return err
 	}
-	t.rows = int(float32(height) * t.config.Height)
+	t.rows = int(float64(height) * t.config.Height)
 	t.cols = width
 	return nil
 }

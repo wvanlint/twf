@@ -1,6 +1,10 @@
 package config
 
 import (
+	"flag"
+	"fmt"
+	"strings"
+
 	term "github.com/wvanlint/twf/terminal"
 )
 
@@ -8,7 +12,8 @@ type TwfConfig struct {
 	Preview     PreviewConfig
 	TreeView    TreeViewConfig
 	Terminal    term.TerminalConfig
-	KeyBindings KeyBindings
+	Graphics    GraphicsMapping
+	Keybindings Keybindings
 }
 
 type PreviewConfig struct {
@@ -17,34 +22,90 @@ type PreviewConfig struct {
 }
 
 type TreeViewConfig struct {
-	Graphics    GraphicsConfig
 	FindCommand string
 }
 
-type GraphicsConfig map[string]term.Graphics
-type KeyBindings map[string][]string
+type GraphicsMapping map[string]*term.Graphics
 
-var defaultConfig = TwfConfig{
-	TreeView: TreeViewConfig{
-		Graphics: map[string]term.Graphics{
-			"dir": term.Graphics{
-				FgColor: term.Color3Bit{Value: 4, Bright: true},
-				Bold:    true,
-			},
-			"cursor": term.Graphics{
-				Reverse: true,
-			},
+func NewGraphicsMapping() GraphicsMapping {
+	return make(map[string]*term.Graphics)
+}
+
+func (m GraphicsMapping) String() string {
+	pairStrs := []string{}
+	for key, graphics := range m {
+		pairStrs = append(pairStrs, fmt.Sprint(key, "::", graphicsToString(graphics)))
+	}
+	return strings.Join(pairStrs, ",")
+}
+
+func (m GraphicsMapping) Set(s string) error {
+	parts := strings.Split(s, ",")
+	for _, part := range parts {
+		pair := strings.Split(part, "::")
+		if len(pair) != 2 {
+			return fmt.Errorf("Unexpected graphics configuration string: %s", s)
+		}
+		g, err := parseGraphics(pair[1])
+		if err != nil {
+			return err
+		}
+		m[pair[1]] = g
+	}
+	return nil
+}
+
+func defaultGraphicsMapping() GraphicsMapping {
+	return map[string]*term.Graphics{
+		"tree:dir": &term.Graphics{
+			FgColor: term.Color3Bit{Value: 4, Bright: true},
+			Bold:    true,
 		},
-		FindCommand: "fzf",
-	},
-	Preview: PreviewConfig{
-		Enabled:        true,
-		PreviewCommand: "bat {}",
-	},
-	Terminal: term.TerminalConfig{
-		Height: 0.2,
-	},
-	KeyBindings: map[string][]string{
+		"tree:cursor": &term.Graphics{
+			Reverse: true,
+		},
+	}
+}
+
+type Keybindings map[string][]string
+
+func NewKeybindings() Keybindings {
+	return make(map[string][]string)
+}
+
+func (ks Keybindings) String() string {
+	bindingStrs := []string{}
+	for hash, cmds := range ks {
+		bindingStrs = append(
+			bindingStrs,
+			fmt.Sprint(
+				eventHashKeyToString(hash),
+				"::",
+				strings.Join(cmds, ";"),
+			),
+		)
+	}
+	return strings.Join(bindingStrs, ",")
+}
+
+func (ks Keybindings) Set(s string) error {
+	bindingStrs := strings.Split(s, ",")
+	for _, bindingStr := range bindingStrs {
+		pair := strings.Split(bindingStr, "::")
+		if len(pair) != 2 {
+			return fmt.Errorf("Unexpected keybinding string: %s", bindingStr)
+		}
+		event, err := parseEvent(pair[0])
+		if err != nil {
+			return err
+		}
+		ks[event.HashKey()] = strings.Split(pair[1], ";")
+	}
+	return nil
+}
+
+func defaultKeybindings() Keybindings {
+	return map[string][]string{
 		(&term.Event{term.Rune, 'j'}).HashKey():     []string{"tree:next"},
 		(&term.Event{term.Rune, 'k'}).HashKey():     []string{"tree:prev"},
 		(&term.Event{term.Rune, 'o'}).HashKey():     []string{"tree:toggle"},
@@ -52,42 +113,47 @@ var defaultConfig = TwfConfig{
 		(&term.Event{term.Rune, '/'}).HashKey():     []string{"tree:findExternal"},
 		(&term.Event{term.Rune, 'q'}).HashKey():     []string{"quit"},
 		(&term.Event{Symbol: term.Enter}).HashKey(): []string{"tree:selectPath", "quit"},
-	},
+	}
 }
 
 func GetConfig() *TwfConfig {
-	return &defaultConfig
+	config := TwfConfig{}
+	flag.StringVar(
+		&config.Preview.PreviewCommand,
+		"previewCmd",
+		"cat {}",
+		"Command to create preview of a file.",
+	)
+	flag.BoolVar(
+		&config.Preview.Enabled,
+		"preview",
+		true,
+		"Enable/disable previews.",
+	)
+	flag.StringVar(
+		&config.TreeView.FindCommand,
+		"findCmd",
+		"fzf",
+		"External command to select a path to locate.",
+	)
+	flag.Float64Var(
+		&config.Terminal.Height,
+		"height",
+		1.0,
+		"Proportion of the vertical space to take up.",
+	)
+	config.Keybindings = defaultKeybindings()
+	flag.Var(
+		config.Keybindings,
+		"bind",
+		"Keybindings for command sequences",
+	)
+	config.Graphics = defaultGraphicsMapping()
+	flag.Var(
+		config.Graphics,
+		"graphics",
+		"Graphics per type of text span.",
+	)
+	flag.Parse()
+	return &config
 }
-
-//func color3BitFromString(s string) (Color, error) {
-//	c := Color3Bit{}
-//	if strings.HasPrefix(s, "bright") {
-//		s = s[len("bright"):]
-//		c.Bright = true
-//	}
-//	switch s {
-//	case "black":
-//		c.Value = 0
-//	case "red":
-//		c.Value = 1
-//	case "green":
-//		c.Value = 2
-//	case "yellow":
-//		c.Value = 3
-//	case "blue":
-//		c.Value = 4
-//	case "magenta":
-//		c.Value = 5
-//	case "cyan":
-//		c.Value = 6
-//	case "white":
-//		c.Value = 7
-//	default:
-//		return nil, errors.New("Could not interpret color string.")
-//	}
-//	return &c, nil
-//}
-//
-//func ColorFromString(s string) (Color, error) {
-//	return Color3BitFromString(s)
-//}

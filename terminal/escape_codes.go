@@ -111,6 +111,22 @@ func (c Color3Bit) BgCode() string {
 	}
 }
 
+func (c Color8Bit) FgCode() string {
+	return fmt.Sprint("38;5;", c.Value)
+}
+
+func (c Color8Bit) BgCode() string {
+	return fmt.Sprint("48;5;", c.Value)
+}
+
+func (c Color24Bit) FgCode() string {
+	return fmt.Sprint("38;2;", c.R, ";", c.G, ";", c.B)
+}
+
+func (c Color24Bit) BgCode() string {
+	return fmt.Sprint("48;2;", c.R, ";", c.G, ";", c.B)
+}
+
 type Graphics struct {
 	FgColor Color
 	BgColor Color

@@ -51,7 +51,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	err = t.StartLoop(config.KeyBindings, views)
+	err = t.StartLoop(config.Keybindings, views)
 	if err != nil {
 		panic(err)
 	}

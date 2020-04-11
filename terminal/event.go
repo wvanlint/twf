@@ -72,7 +72,11 @@ type Event struct {
 }
 
 func (e *Event) HashKey() string {
-	return fmt.Sprint(e.Symbol, "#", e.Value)
+	if e.Symbol == Rune {
+		return string(e.Value)
+	} else {
+		return fmt.Sprint("#", e.Symbol)
+	}
 }
 
 func cmp(a []byte, b []byte) bool {
