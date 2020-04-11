@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/wvanlint/twf/internal/config"
@@ -17,31 +16,35 @@ import (
 func main() {
 	config := config.GetConfig()
 
-	logger, err := zap.Config{
-		Level:       zap.NewAtomicLevelAt(zap.DebugLevel),
-		Encoding:    "console",
-		OutputPaths: []string{"/tmp/twf.log"},
-		EncoderConfig: zapcore.EncoderConfig{
-			MessageKey:  "message",
-			LevelKey:    "level",
-			TimeKey:     "time",
-			EncodeLevel: zapcore.CapitalColorLevelEncoder,
-			EncodeTime:  zapcore.RFC3339TimeEncoder,
-		},
-	}.Build()
-	if err != nil {
-		panic(err)
+	if config.LogLevel != "" {
+		var level zapcore.Level
+		if err := level.UnmarshalText([]byte(config.LogLevel)); err != nil {
+			panic(err)
+		}
+		logger, err := zap.Config{
+			Level:       zap.NewAtomicLevelAt(zap.DebugLevel),
+			Encoding:    "console",
+			OutputPaths: []string{"/tmp/twf.log"},
+			EncoderConfig: zapcore.EncoderConfig{
+				MessageKey:  "message",
+				LevelKey:    "level",
+				TimeKey:     "time",
+				EncodeLevel: zapcore.CapitalColorLevelEncoder,
+				EncodeTime:  zapcore.RFC3339TimeEncoder,
+			},
+		}.Build()
+		if err != nil {
+			panic(err)
+		}
+		defer logger.Sync()
+		zap.ReplaceGlobals(logger)
+	} else {
+		zap.ReplaceGlobals(zap.NewNop())
 	}
-	defer logger.Sync()
-	zap.ReplaceGlobals(logger)
 
 	zap.L().Info("Starting twf.")
 
-	wd, err := os.Getwd()
-	if err != nil {
-		panic(err)
-	}
-	tree, err := filetree.InitFileTree(wd)
+	tree, err := filetree.InitFileTree(config.Dir)
 	if err != nil {
 		panic(err)
 	}
@@ -66,6 +69,8 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Println(strings.Join(state.Selection, "\n"))
+	if len(state.Selection) > 0 {
+		fmt.Println(strings.Join(state.Selection, "\n"))
+	}
 	zap.L().Info("Stopping twf.")
 }

@@ -16,16 +16,16 @@ type FileTree struct {
 }
 
 func InitFileTree(p string) (*FileTree, error) {
-	f, err := os.Open(p)
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.Open(abs)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 	info, err := f.Stat()
-	if err != nil {
-		return nil, err
-	}
-	abs, err := filepath.Abs(p)
 	if err != nil {
 		return nil, err
 	}

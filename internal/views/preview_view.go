@@ -8,7 +8,6 @@ import (
 	"github.com/wvanlint/twf/internal/config"
 	"github.com/wvanlint/twf/internal/state"
 	term "github.com/wvanlint/twf/internal/terminal"
-	"go.uber.org/zap"
 )
 
 type previewView struct {
@@ -71,9 +70,6 @@ func (v *previewView) Render(p term.Position) []term.Line {
 	for i := v.scroll; i-v.scroll < p.Rows && i < len(lines); i++ {
 		termLine := term.NewLine(&term.Graphics{}, p.Cols)
 		termLine.AppendRaw(lines[i])
-		zap.L().Sugar().Info(p.Cols)
-		zap.L().Sugar().Info(termLine.Length())
-		zap.L().Sugar().Info(termLine.Text())
 		termLines = append(termLines, termLine)
 	}
 	return termLines

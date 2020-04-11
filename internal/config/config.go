@@ -9,6 +9,8 @@ import (
 )
 
 type TwfConfig struct {
+	LogLevel    string
+	Dir         string
 	Preview     PreviewConfig
 	TreeView    TreeViewConfig
 	Terminal    term.TerminalConfig
@@ -120,6 +122,18 @@ func defaultKeybindings() Keybindings {
 
 func GetConfig() *TwfConfig {
 	config := TwfConfig{}
+	flag.StringVar(
+		&config.LogLevel,
+		"loglevel",
+		"",
+		"Logging priority. Empty disables logging.",
+	)
+	flag.StringVar(
+		&config.Dir,
+		"dir",
+		".",
+		"Root directory.",
+	)
 	flag.StringVar(
 		&config.Preview.PreviewCommand,
 		"previewCmd",

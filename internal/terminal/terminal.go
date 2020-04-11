@@ -145,16 +145,15 @@ func (t *Terminal) render(views []View) {
 			} else {
 				lineRender.WriteString(strings.Repeat(" ", p.Cols))
 			}
+			if p.Top+row < t.rows {
+				lineRender.WriteString("\n")
+				t.currentRow += 1
+			}
 			lineRender.WriteString(t.position(1, 1))
 			if _, ok := t.previousRender[lineRender.String()]; !ok {
 				out.WriteString(lineRender.String())
 			}
 			newRender[lineRender.String()] = true
-			//if p.Top+row < t.rows {
-			//	out.WriteString("\n")
-			//	t.currentRow += 1
-			//}
-			//t.moveTo(out, 1, 1)
 		}
 	}
 	t.out.WriteString(out.String())
@@ -198,6 +197,7 @@ func (t *Terminal) StartLoop(bindings map[string][]string, views []View) (err er
 	for {
 		select {
 		case <-intSigs:
+			zap.L().Debug("Received interrupt.")
 			t.loop = false
 		case <-winChSig:
 			zap.L().Debug("Received window change.")
@@ -209,6 +209,7 @@ func (t *Terminal) StartLoop(bindings map[string][]string, views []View) (err er
 			cmdKeys, ok := bindings[event.HashKey()]
 			zap.L().Sugar().Debug("Cmds: ", cmdKeys)
 			if !ok {
+				nextEvents <- true
 				continue
 			}
 			for _, cmdKey := range cmdKeys {
