@@ -1,7 +1,6 @@
 package terminal
 
 import (
-	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -29,68 +28,33 @@ type Color interface {
 	ToAnsiBg() string
 }
 
-type color3Bit struct {
-	value    int
-	isBright bool
+type Color3Bit struct {
+	Value  int
+	Bright bool
 }
 
-type color8Bit struct {
-	value int
+type Color8Bit struct {
+	Value int
 }
 
-type color24Bit struct {
-	r int
-	g int
-	b int
+type Color24Bit struct {
+	R, G, B int
 }
 
-func (c *color3Bit) ToAnsiFg() string {
-	if c.isBright {
-		return fmt.Sprintf("9%d", c.value)
+func (c Color3Bit) ToAnsiFg() string {
+	if c.Bright {
+		return fmt.Sprintf("9%d", c.Value)
 	} else {
-		return fmt.Sprintf("3%d", c.value)
+		return fmt.Sprintf("3%d", c.Value)
 	}
 }
 
-func (c *color3Bit) ToAnsiBg() string {
-	if c.isBright {
-		return fmt.Sprintf("10%d", c.value)
+func (c Color3Bit) ToAnsiBg() string {
+	if c.Bright {
+		return fmt.Sprintf("10%d", c.Value)
 	} else {
-		return fmt.Sprintf("4%d", c.value)
+		return fmt.Sprintf("4%d", c.Value)
 	}
-}
-
-func color3BitFromString(s string) (Color, error) {
-	c := color3Bit{}
-	if strings.HasPrefix(s, "bright") {
-		s = s[len("bright"):]
-		c.isBright = true
-	}
-	switch s {
-	case "black":
-		c.value = 0
-	case "red":
-		c.value = 1
-	case "green":
-		c.value = 2
-	case "yellow":
-		c.value = 3
-	case "blue":
-		c.value = 4
-	case "magenta":
-		c.value = 5
-	case "cyan":
-		c.value = 6
-	case "white":
-		c.value = 7
-	default:
-		return nil, errors.New("Could not interpret color string.")
-	}
-	return &c, nil
-}
-
-func ColorFromString(s string) (Color, error) {
-	return color3BitFromString(s)
 }
 
 type Graphics struct {

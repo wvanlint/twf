@@ -5,15 +5,24 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/wvanlint/twf/config"
 	term "github.com/wvanlint/twf/terminal"
 	"go.uber.org/zap"
 )
 
-type PreviewView struct {
-	state *AppState
+type previewView struct {
+	config *config.TwfConfig
+	state  *AppState
 }
 
-func (v *PreviewView) Position(totalRows int, totalCols int) term.Position {
+func NewPreviewView(config *config.TwfConfig, state *AppState) term.View {
+	return &previewView{
+		config: config,
+		state:  state,
+	}
+}
+
+func (v *previewView) Position(totalRows int, totalCols int) term.Position {
 	return term.Position{
 		Top:  1,
 		Left: int(math.Ceil(float64(totalCols)/2.0)) + 1,
@@ -22,15 +31,15 @@ func (v *PreviewView) Position(totalRows int, totalCols int) term.Position {
 	}
 }
 
-func (v *PreviewView) HasBorder() bool {
+func (v *previewView) HasBorder() bool {
 	return true
 }
 
-func (v *PreviewView) ShouldRender() bool {
-	return !v.state.Root.FindPath(v.state.Cursor).IsDir()
+func (v *previewView) ShouldRender() bool {
+	return v.config.Preview.Enabled && !v.state.Root.FindPath(v.state.Cursor).IsDir()
 }
 
-func (v *PreviewView) Render(p term.Position) []term.Line {
+func (v *previewView) Render(p term.Position) []term.Line {
 	output, err := getPreview("bat --color always {}", v.state.Cursor)
 	output = strings.ReplaceAll(output, "\t", "    ")
 	if err != nil {
@@ -57,6 +66,6 @@ func getPreview(cmdTemplate string, path string) (string, error) {
 	return output.String(), err
 }
 
-func (v *PreviewView) GetCommands() map[string]term.Command {
+func (v *previewView) GetCommands() map[string]term.Command {
 	return map[string]term.Command{}
 }

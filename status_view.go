@@ -1,14 +1,23 @@
 package main
 
 import (
+	"github.com/wvanlint/twf/config"
 	term "github.com/wvanlint/twf/terminal"
 )
 
-type StatusView struct {
-	state *AppState
+type statusView struct {
+	config *config.TwfConfig
+	state  *AppState
 }
 
-func (v *StatusView) Position(totalRows int, totalCols int) term.Position {
+func NewStatusView(config *config.TwfConfig, state *AppState) term.View {
+	return &statusView{
+		config: config,
+		state:  state,
+	}
+}
+
+func (v *statusView) Position(totalRows int, totalCols int) term.Position {
 	return term.Position{
 		Top:  totalRows,
 		Left: 1,
@@ -17,20 +26,20 @@ func (v *StatusView) Position(totalRows int, totalCols int) term.Position {
 	}
 }
 
-func (v *StatusView) HasBorder() bool {
+func (v *statusView) HasBorder() bool {
 	return false
 }
 
-func (v *StatusView) ShouldRender() bool {
+func (v *statusView) ShouldRender() bool {
 	return true
 }
 
-func (v *StatusView) Render(p term.Position) []term.Line {
+func (v *statusView) Render(p term.Position) []term.Line {
 	line := term.NewLine(&term.Graphics{}, p.Cols)
 	line.Append("", &term.Graphics{})
 	return []term.Line{line}
 }
 
-func (v *StatusView) GetCommands() map[string]term.Command {
+func (v *statusView) GetCommands() map[string]term.Command {
 	return map[string]term.Command{}
 }

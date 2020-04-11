@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/wvanlint/twf/config"
 	"github.com/wvanlint/twf/terminal"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -26,6 +27,7 @@ func main() {
 	zap.ReplaceGlobals(logger)
 	zap.L().Info("Starting twf.")
 
+	config := config.GetConfig()
 	tree, err := InitTreeFromWd()
 	if err != nil {
 		panic(err)
@@ -35,11 +37,10 @@ func main() {
 		Cursor:     tree.Path,
 		Expansions: map[string]bool{tree.Path: true},
 	}
-	treeView := TreeView{state: &state}
 	views := []terminal.View{
-		&treeView,
-		&PreviewView{state: &state},
-		&StatusView{state: &state},
+		NewTreeView(config, &state),
+		NewPreviewView(config, &state),
+		NewStatusView(config, &state),
 	}
 	bindings := map[string]string{
 		(&terminal.Event{terminal.Rune, 'j'}).HashKey(): "tree:next",

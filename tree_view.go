@@ -5,10 +5,12 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/wvanlint/twf/config"
 	term "github.com/wvanlint/twf/terminal"
 )
 
-type TreeView struct {
+type treeView struct {
+	config       *config.TwfConfig
 	state        *AppState
 	pathsByIndex map[string]int
 	paths        []string
@@ -16,33 +18,40 @@ type TreeView struct {
 	rows         int
 }
 
-func (v *TreeView) Position(totalRows int, totalCols int) term.Position {
-	if v.state.Root.FindPath(v.state.Cursor).IsDir() {
-		return term.Position{
-			Top:  1,
-			Left: 1,
-			Rows: totalRows - 1,
-			Cols: totalCols,
-		}
-	} else {
+func NewTreeView(config *config.TwfConfig, state *AppState) term.View {
+	return &treeView{
+		config: config,
+		state:  state,
+	}
+}
+
+func (v *treeView) Position(totalRows int, totalCols int) term.Position {
+	if v.config.Preview.Enabled && !v.state.Root.FindPath(v.state.Cursor).IsDir() {
 		return term.Position{
 			Top:  1,
 			Left: 1,
 			Rows: totalRows - 1,
 			Cols: int(math.Ceil(float64(totalCols) / 2.0)),
 		}
+	} else {
+		return term.Position{
+			Top:  1,
+			Left: 1,
+			Rows: totalRows - 1,
+			Cols: totalCols,
+		}
 	}
 }
 
-func (v *TreeView) HasBorder() bool {
+func (v *treeView) HasBorder() bool {
 	return false
 }
 
-func (v *TreeView) ShouldRender() bool {
+func (v *treeView) ShouldRender() bool {
 	return true
 }
 
-func (v *TreeView) renderNode(
+func (v *treeView) renderNode(
 	node *Tree,
 	indentation int,
 	maxLength int,
@@ -52,17 +61,16 @@ func (v *TreeView) renderNode(
 
 	graphics := term.Graphics{}
 	if node.IsDir() {
-		graphics.FgColor, _ = term.ColorFromString("brightblue")
-		graphics.Bold = true
+		graphics = v.config.TreeView.Graphics["dir"]
 	}
 	if node.Path == v.state.Cursor {
-		graphics.Reverse = true
+		graphics = v.config.TreeView.Graphics["cursor"]
 	}
 	line.Append(node.info.Name(), &graphics)
 	return line
 }
 
-func (v *TreeView) Render(p term.Position) []term.Line {
+func (v *treeView) Render(p term.Position) []term.Line {
 	lines := []term.Line{}
 	v.rows = p.Rows
 	v.pathsByIndex = make(map[string]int)
@@ -94,7 +102,7 @@ func (v *TreeView) Render(p term.Position) []term.Line {
 	return lines[v.state.Scroll:]
 }
 
-func (v *TreeView) getNextPath() string {
+func (v *treeView) getNextPath() string {
 	if v.cursorLine == len(v.paths)-1 {
 		return v.paths[len(v.paths)-1]
 	} else {
@@ -102,7 +110,7 @@ func (v *TreeView) getNextPath() string {
 	}
 }
 
-func (v *TreeView) getPrevPath() string {
+func (v *treeView) getPrevPath() string {
 	if v.cursorLine == 0 {
 		return v.paths[0]
 	} else {
@@ -110,7 +118,7 @@ func (v *TreeView) getPrevPath() string {
 	}
 }
 
-func (v *TreeView) scrollForPath(path string) int {
+func (v *treeView) scrollForPath(path string) int {
 	targetLine := v.pathsByIndex[path]
 	if targetLine < v.state.Scroll {
 		return targetLine
@@ -121,7 +129,7 @@ func (v *TreeView) scrollForPath(path string) int {
 	}
 }
 
-func (v *TreeView) GetCommands() map[string]term.Command {
+func (v *treeView) GetCommands() map[string]term.Command {
 	return map[string]term.Command{
 		"tree:prev":         v.prev,
 		"tree:next":         v.next,
@@ -136,47 +144,47 @@ func (v *TreeView) GetCommands() map[string]term.Command {
 	}
 }
 
-func (v *TreeView) prev(helper term.TerminalHelper, args ...interface{}) {
+func (v *treeView) prev(helper term.TerminalHelper, args ...interface{}) {
 	p := v.getPrevPath()
 	v.state.ChangeCursor(p)
 	v.state.ChangeScroll(v.scrollForPath(p))
 }
 
-func (v *TreeView) next(helper term.TerminalHelper, args ...interface{}) {
+func (v *treeView) next(helper term.TerminalHelper, args ...interface{}) {
 	p := v.getNextPath()
 	v.state.ChangeCursor(p)
 	v.state.ChangeScroll(v.scrollForPath(p))
 }
 
-func (v *TreeView) open(helper term.TerminalHelper, args ...interface{}) {
+func (v *treeView) open(helper term.TerminalHelper, args ...interface{}) {
 	v.state.SetExpansion(v.state.Cursor, true)
 }
 
-func (v *TreeView) close(helper term.TerminalHelper, args ...interface{}) {
+func (v *treeView) close(helper term.TerminalHelper, args ...interface{}) {
 	v.state.SetExpansion(v.state.Cursor, false)
 }
 
-func (v *TreeView) toggle(helper term.TerminalHelper, args ...interface{}) {
+func (v *treeView) toggle(helper term.TerminalHelper, args ...interface{}) {
 	v.state.ToggleExpansion(v.state.Cursor)
 }
 
-func (v *TreeView) toggleAll(helper term.TerminalHelper, args ...interface{}) {
+func (v *treeView) toggleAll(helper term.TerminalHelper, args ...interface{}) {
 	v.state.ToggleExpansionAll(v.state.Cursor)
 }
 
-func (v *TreeView) openAll(helper term.TerminalHelper, args ...interface{}) {
+func (v *treeView) openAll(helper term.TerminalHelper, args ...interface{}) {
 	v.state.SetExpansionAll(v.state.Cursor, true)
 }
 
-func (v *TreeView) closeAll(helper term.TerminalHelper, args ...interface{}) {
+func (v *treeView) closeAll(helper term.TerminalHelper, args ...interface{}) {
 	v.state.SetExpansionAll(v.state.Cursor, false)
 }
 
-func (v *TreeView) parent(helper term.TerminalHelper, args ...interface{}) {
+func (v *treeView) parent(helper term.TerminalHelper, args ...interface{}) {
 	v.state.MoveCursorToParent()
 }
 
-func (v *TreeView) findExternal(helper term.TerminalHelper, args ...interface{}) {
+func (v *treeView) findExternal(helper term.TerminalHelper, args ...interface{}) {
 	content, _ := helper.ExecuteInTerminal("fzf")
 	v.state.ChangeCursor(strings.TrimSpace(content))
 }
