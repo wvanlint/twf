@@ -1,9 +1,19 @@
 package terminal
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"regexp"
+	"strconv"
 	"strings"
 )
+
+var reportRegex *regexp.Regexp
+
+func init() {
+	reportRegex = regexp.MustCompile("\x1b\\[(\\d+);(\\d+)R")
+}
 
 const (
 	csi = "\x1b["
@@ -14,6 +24,10 @@ const (
 	hideCursor    = csi + "?25l"
 	enableWrap    = csi + "?7h"
 	disableWrap   = csi + "?7l"
+
+	deviceStatusReport = csi + "6n"
+	saveCursor         = csi + "s"
+	restoreCursor      = csi + "u"
 
 	eraseDisplayEnd = csi + "0J"
 	eraseDisplayAll = csi + "2J"
@@ -162,4 +176,25 @@ func (g *Graphics) Merge(other *Graphics) {
 	}
 	g.Bold = g.Bold || other.Bold
 	g.Reverse = g.Reverse || other.Reverse
+}
+
+func readReport(in io.Reader) (int, int, error) {
+	input := make([]byte, 128)
+	n, err := in.Read(input)
+	if err != nil {
+		return 0, 0, err
+	}
+	match := reportRegex.FindStringSubmatch(string(input[:n]))
+	if match == nil {
+		return 0, 0, errors.New("could not parse report")
+	}
+	row, err := strconv.Atoi(match[1])
+	if err != nil {
+		return 0, 0, err
+	}
+	col, err := strconv.Atoi(match[2])
+	if err != nil {
+		return 0, 0, err
+	}
+	return row, col, nil
 }

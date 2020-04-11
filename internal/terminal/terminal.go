@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"runtime/debug"
 	"strings"
-	//	"time"
 
 	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh/terminal"
@@ -16,15 +15,16 @@ import (
 )
 
 type Terminal struct {
-	config         *TerminalConfig
-	originalState  terminal.State
-	previousRender map[string]bool
-	rows           int
-	cols           int
-	in             *os.File
-	out            *os.File
-	loop           bool
-	currentRow     int
+	config          *TerminalConfig
+	originalState   terminal.State
+	insertedNewline bool
+	previousRender  map[string]bool
+	rows            int
+	cols            int
+	in              *os.File
+	out             *os.File
+	loop            bool
+	currentRow      int
 }
 
 type TerminalConfig struct {
@@ -53,10 +53,19 @@ func (t *Terminal) initTerm() error {
 		return err
 	}
 	t.originalState = *state
+
 	if t.config.Height == 1.0 {
 		t.out.WriteString(enableAltBuf)
 		t.out.WriteString(cursorPosition(1, 1))
+	} else {
+		t.out.WriteString(deviceStatusReport)
+		_, col, err := readReport(t.in)
+		if err == nil && col > 1 {
+			t.out.WriteString("\n")
+			t.insertedNewline = true
+		}
 	}
+
 	t.out.WriteString(disableWrap)
 	t.out.WriteString(hideCursor)
 	return nil
@@ -66,6 +75,8 @@ func (t *Terminal) revertTerm() {
 	if t.config.Height == 1.0 {
 		t.out.WriteString(enableAltBuf)
 		t.out.WriteString(disableAltBuf)
+	} else if t.insertedNewline {
+		t.out.WriteString(cursorUp())
 	}
 	t.previousRender = map[string]bool{}
 	t.out.WriteString(enableWrap)
@@ -226,7 +237,6 @@ func (t *Terminal) StartLoop(bindings map[string][]string, views []View) (err er
 			}
 			nextEvents <- true
 			t.render(views)
-			//time.Sleep(10 * time.Millisecond)
 		}
 		if !t.loop {
 			break
