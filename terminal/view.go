@@ -5,6 +5,13 @@ type View interface {
 	HasBorder() bool
 	ShouldRender() bool
 	Render(Position) []Line
+	GetCommands() map[string]Command
+}
+
+type Command func(helper TerminalHelper, args ...interface{})
+
+type TerminalHelper interface {
+	ExecuteInTerminal(string) (string, error)
 }
 
 type Position struct {

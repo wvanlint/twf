@@ -16,8 +16,8 @@ type TreeView struct {
 	rows         int
 }
 
-func (tv *TreeView) Position(totalRows int, totalCols int) term.Position {
-	if tv.state.Root.FindPath(tv.state.Cursor).IsDir() {
+func (v *TreeView) Position(totalRows int, totalCols int) term.Position {
+	if v.state.Root.FindPath(v.state.Cursor).IsDir() {
 		return term.Position{
 			Top:  1,
 			Left: 1,
@@ -34,15 +34,15 @@ func (tv *TreeView) Position(totalRows int, totalCols int) term.Position {
 	}
 }
 
-func (tv *TreeView) HasBorder() bool {
+func (v *TreeView) HasBorder() bool {
 	return false
 }
 
-func (tv *TreeView) ShouldRender() bool {
+func (v *TreeView) ShouldRender() bool {
 	return true
 }
 
-func (tv *TreeView) renderNode(
+func (v *TreeView) renderNode(
 	node *Tree,
 	indentation int,
 	maxLength int,
@@ -55,35 +55,35 @@ func (tv *TreeView) renderNode(
 		graphics.FgColor, _ = term.ColorFromString("brightblue")
 		graphics.Bold = true
 	}
-	if node.Path == tv.state.Cursor {
+	if node.Path == v.state.Cursor {
 		graphics.Reverse = true
 	}
 	line.Append(node.info.Name(), &graphics)
 	return line
 }
 
-func (tv *TreeView) Render(p term.Position) []term.Line {
+func (v *TreeView) Render(p term.Position) []term.Line {
 	lines := []term.Line{}
-	tv.rows = p.Rows
-	tv.pathsByIndex = make(map[string]int)
-	tv.paths = []string{}
+	v.rows = p.Rows
+	v.pathsByIndex = make(map[string]int)
+	v.paths = []string{}
 	type Item struct {
 		tree  *Tree
 		depth int
 	}
-	stack := []Item{Item{tv.state.Root, 0}}
+	stack := []Item{Item{v.state.Root, 0}}
 	for len(stack) > 0 {
 		var item Item
 		item, stack = stack[len(stack)-1], stack[:len(stack)-1]
-		line := tv.renderNode(item.tree, item.depth, p.Cols)
-		tv.pathsByIndex[item.tree.Path] = len(lines)
-		tv.paths = append(tv.paths, item.tree.Path)
-		if item.tree.Path == tv.state.Cursor {
-			tv.cursorLine = len(lines)
+		line := v.renderNode(item.tree, item.depth, p.Cols)
+		v.pathsByIndex[item.tree.Path] = len(lines)
+		v.paths = append(v.paths, item.tree.Path)
+		if item.tree.Path == v.state.Cursor {
+			v.cursorLine = len(lines)
 		}
 		lines = append(lines, line)
 
-		if value, _ := tv.state.Expansions[item.tree.Path]; value {
+		if value, _ := v.state.Expansions[item.tree.Path]; value {
 			children := item.tree.Children()
 			sort.Slice(children, ByTypeAndName(children))
 			for i := len(children) - 1; i >= 0; i-- {
@@ -91,32 +91,92 @@ func (tv *TreeView) Render(p term.Position) []term.Line {
 			}
 		}
 	}
-	return lines[tv.state.Scroll:]
+	return lines[v.state.Scroll:]
 }
 
-func (tv *TreeView) GetNextPath() string {
-	if tv.cursorLine == len(tv.paths)-1 {
-		return tv.paths[len(tv.paths)-1]
+func (v *TreeView) getNextPath() string {
+	if v.cursorLine == len(v.paths)-1 {
+		return v.paths[len(v.paths)-1]
 	} else {
-		return tv.paths[tv.cursorLine+1]
+		return v.paths[v.cursorLine+1]
 	}
 }
 
-func (tv *TreeView) GetPrevPath() string {
-	if tv.cursorLine == 0 {
-		return tv.paths[0]
+func (v *TreeView) getPrevPath() string {
+	if v.cursorLine == 0 {
+		return v.paths[0]
 	} else {
-		return tv.paths[tv.cursorLine-1]
+		return v.paths[v.cursorLine-1]
 	}
 }
 
-func (tv *TreeView) ScrollForPath(path string) int {
-	targetLine := tv.pathsByIndex[path]
-	if targetLine < tv.state.Scroll {
+func (v *TreeView) scrollForPath(path string) int {
+	targetLine := v.pathsByIndex[path]
+	if targetLine < v.state.Scroll {
 		return targetLine
-	} else if targetLine >= tv.state.Scroll+tv.rows {
-		return targetLine - tv.rows + 1
+	} else if targetLine >= v.state.Scroll+v.rows {
+		return targetLine - v.rows + 1
 	} else {
-		return tv.state.Scroll
+		return v.state.Scroll
 	}
+}
+
+func (v *TreeView) GetCommands() map[string]term.Command {
+	return map[string]term.Command{
+		"tree:prev":         v.prev,
+		"tree:next":         v.next,
+		"tree:open":         v.open,
+		"tree:close":        v.close,
+		"tree:toggle":       v.toggle,
+		"tree:toggleAll":    v.toggleAll,
+		"tree:openAll":      v.openAll,
+		"tree:closeAll":     v.closeAll,
+		"tree:parent":       v.parent,
+		"tree:findExternal": v.findExternal,
+	}
+}
+
+func (v *TreeView) prev(helper term.TerminalHelper, args ...interface{}) {
+	p := v.getPrevPath()
+	v.state.ChangeCursor(p)
+	v.state.ChangeScroll(v.scrollForPath(p))
+}
+
+func (v *TreeView) next(helper term.TerminalHelper, args ...interface{}) {
+	p := v.getNextPath()
+	v.state.ChangeCursor(p)
+	v.state.ChangeScroll(v.scrollForPath(p))
+}
+
+func (v *TreeView) open(helper term.TerminalHelper, args ...interface{}) {
+	v.state.SetExpansion(v.state.Cursor, true)
+}
+
+func (v *TreeView) close(helper term.TerminalHelper, args ...interface{}) {
+	v.state.SetExpansion(v.state.Cursor, false)
+}
+
+func (v *TreeView) toggle(helper term.TerminalHelper, args ...interface{}) {
+	v.state.ToggleExpansion(v.state.Cursor)
+}
+
+func (v *TreeView) toggleAll(helper term.TerminalHelper, args ...interface{}) {
+	v.state.ToggleExpansionAll(v.state.Cursor)
+}
+
+func (v *TreeView) openAll(helper term.TerminalHelper, args ...interface{}) {
+	v.state.SetExpansionAll(v.state.Cursor, true)
+}
+
+func (v *TreeView) closeAll(helper term.TerminalHelper, args ...interface{}) {
+	v.state.SetExpansionAll(v.state.Cursor, false)
+}
+
+func (v *TreeView) parent(helper term.TerminalHelper, args ...interface{}) {
+	v.state.MoveCursorToParent()
+}
+
+func (v *TreeView) findExternal(helper term.TerminalHelper, args ...interface{}) {
+	content, _ := helper.ExecuteInTerminal("fzf")
+	v.state.ChangeCursor(strings.TrimSpace(content))
 }

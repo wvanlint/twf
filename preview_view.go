@@ -56,3 +56,7 @@ func getPreview(cmdTemplate string, path string) (string, error) {
 	err := preview.Run()
 	return output.String(), err
 }
+
+func (v *PreviewView) GetCommands() map[string]term.Command {
+	return map[string]term.Command{}
+}

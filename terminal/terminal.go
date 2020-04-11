@@ -10,7 +10,6 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
-	//	"time"
 
 	"go.uber.org/zap"
 )
@@ -28,31 +27,17 @@ const (
 	cursorPosition = "H"
 )
 
-type Callbacks struct {
-	ChangeCursor func(string)
-	Prev         func()
-	Next         func()
-	Up           func()
-	Open         func()
-	Close        func()
-	OpenAll      func()
-	CloseAll     func()
-	Toggle       func()
-	ToggleAll    func()
-	Quit         func()
-}
-
 type Terminal struct {
 	originalTermios sys.Termios
 	winSize         sys.Winsize
 	renderedPaths   []string
 	cursorLine      int
-	callbacks       Callbacks
 	in              *os.File
 	out             *os.File
+	loop            bool
 }
 
-func InitTerm(callbacks Callbacks) (*Terminal, error) {
+func OpenTerm() (*Terminal, error) {
 	termios, err := sys.IoctlGetTermios(1, sys.TIOCGETA)
 	if err != nil {
 		return nil, err
@@ -64,15 +49,14 @@ func InitTerm(callbacks Callbacks) (*Terminal, error) {
 	outFd, err := sys.Open("/dev/tty", sys.O_WRONLY, 0)
 	term := Terminal{
 		originalTermios: *termios,
-		callbacks:       callbacks,
 		in:              os.NewFile(uintptr(inFd), "/dev/tty"),
 		out:             os.NewFile(uintptr(outFd), "/dev/tty"),
 	}
 
-	return &term, term.init()
+	return &term, term.initTerm()
 }
 
-func (t *Terminal) init() error {
+func (t *Terminal) initTerm() error {
 	termios := t.originalTermios
 	termios.Iflag &^= uint64(sys.IGNCR) | uint64(sys.INLCR) | uint64(sys.ICRNL)
 	termios.Lflag &^= uint64(sys.ECHO) | uint64(sys.ICANON)
@@ -83,6 +67,19 @@ func (t *Terminal) init() error {
 	t.out.WriteString(escape + altbuf + high)
 	t.out.WriteString(escape + cursor + low)
 	return nil
+}
+
+func (t *Terminal) revertTerm() {
+	t.out.WriteString(escape + altbuf + high)
+	t.out.WriteString(escape + altbuf + low)
+	t.out.WriteString(escape + cursor + high)
+	sys.IoctlSetTermios(1, sys.TIOCSETA, &t.originalTermios)
+}
+
+func (t *Terminal) Close() {
+	t.revertTerm()
+	t.in.Close()
+	t.out.Close()
 }
 
 func moveTo(row int, col int) string {
@@ -132,15 +129,6 @@ func (t *Terminal) render(views []View) {
 	}
 }
 
-func (t *Terminal) Close() {
-	t.out.WriteString(escape + altbuf + high)
-	t.out.WriteString(escape + altbuf + low)
-	t.out.WriteString(escape + cursor + high)
-	sys.IoctlSetTermios(1, sys.TIOCSETA, &t.originalTermios)
-	t.in.Close()
-	t.out.Close()
-}
-
 func (t *Terminal) fetchWinSize() error {
 	winSize, err := sys.IoctlGetWinsize(1, sys.TIOCGWINSZ)
 	if err != nil {
@@ -150,7 +138,7 @@ func (t *Terminal) fetchWinSize() error {
 	return nil
 }
 
-func (t *Terminal) StartLoop(views []View, stop chan bool) (err error) {
+func (t *Terminal) StartLoop(bindings map[string]string, views []View) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Terminal: %v, stacktrace: %s", r, string(debug.Stack()))
@@ -163,76 +151,73 @@ func (t *Terminal) StartLoop(views []View, stop chan bool) (err error) {
 	winChSig := make(chan os.Signal, 1)
 	signal.Notify(winChSig, sys.SIGWINCH)
 
-	eventSig := make(chan []byte, 1)
-	go func() {
-		for {
-			input := make([]byte, 128)
-			_, err := t.in.Read(input)
-			if err == nil {
-				eventSig <- input
-			}
-		}
-	}()
+	events := make(chan Event, 1)
+	go sendEventsLoop(t.in, events)
 
-	stopLoop := false
 	err = t.fetchWinSize()
 	if err != nil {
 		return err
 	}
 	t.render(views)
+
+	t.loop = true
 	for {
 		select {
 		case <-intSigs:
-			stopLoop = true
-		case <-stop:
-			stopLoop = true
+			t.loop = false
 		case <-winChSig:
 			zap.L().Debug("Received window change.")
 			t.fetchWinSize()
 			t.render(views)
 			zap.L().Debug("Rerendered.")
-		case event := <-eventSig:
-			t.ProcessCommand(event)
-			t.render(views)
+		case event := <-events:
+			if cmdKey, ok := bindings[event.HashKey()]; ok {
+				if cmd, ok := t.getCommands()[cmdKey]; ok {
+					cmd(t)
+				} else {
+					for _, view := range views {
+						if cmd, ok := view.GetCommands()[cmdKey]; ok {
+							cmd(t)
+							break
+						}
+					}
+				}
+				t.render(views)
+			}
 		}
-		if stopLoop {
+		if !t.loop {
 			break
 		}
 	}
 	return err
 }
 
-func (t *Terminal) ProcessCommand(input []byte) {
-	switch input[0] {
-	case 'j':
-		t.callbacks.Next()
-	case 'k':
-		t.callbacks.Prev()
-	case 'q':
-		t.callbacks.Quit()
-	case 27:
-		t.callbacks.Quit()
-	case 'o':
-		t.callbacks.Toggle()
-	case 'O':
-		t.callbacks.ToggleAll()
-	case 'p':
-		t.callbacks.Up()
-	case 'P':
-		t.callbacks.Up()
-		t.callbacks.Close()
-	case '/':
-		tempF, _ := ioutil.TempFile("", "twf_")
-		fzf := exec.Command("bash", "-c", "fzf > "+tempF.Name())
-		fzf.Stdin = t.in
-		fzf.Stdout = t.out
-		fzf.Stderr = t.out
-		t.Close()
-		fzf.Run()
-		t.init()
-		content, _ := ioutil.ReadAll(tempF)
-		tempF.Close()
-		os.Remove(tempF.Name())
-		t.callbacks.ChangeCursor(strings.TrimSpace(string(content)))
+func (t *Terminal) getCommands() map[string]Command {
+	return map[string]Command{
+		"quit": func(_ TerminalHelper, args ...interface{}) {
+			t.loop = false
+		},
 	}
+}
+
+func (t *Terminal) ExecuteInTerminal(cmd string) (string, error) {
+	tempF, err := ioutil.TempFile("", "twf_")
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(tempF.Name())
+	defer tempF.Close()
+
+	fzf := exec.Command("bash", "-c", cmd+" > "+tempF.Name())
+	fzf.Stdin = t.in
+	fzf.Stdout = t.out
+	fzf.Stderr = t.out
+	t.revertTerm()
+	defer t.initTerm()
+	err = fzf.Run()
+	if err != nil {
+		return "", err
+	}
+	out, err := ioutil.ReadAll(tempF)
+	return string(out), err
 }

@@ -24,8 +24,8 @@ func main() {
 	}
 	defer logger.Sync()
 	zap.ReplaceGlobals(logger)
-
 	zap.L().Info("Starting twf.")
+
 	tree, err := InitTreeFromWd()
 	if err != nil {
 		panic(err)
@@ -41,34 +41,21 @@ func main() {
 		&PreviewView{state: &state},
 		&StatusView{state: &state},
 	}
+	bindings := map[string]string{
+		(&terminal.Event{terminal.Rune, 'j'}).HashKey(): "tree:next",
+		(&terminal.Event{terminal.Rune, 'k'}).HashKey(): "tree:prev",
+		(&terminal.Event{terminal.Rune, 'o'}).HashKey(): "tree:toggle",
+		(&terminal.Event{terminal.Rune, 'O'}).HashKey(): "tree:toggleAll",
+		(&terminal.Event{terminal.Rune, '/'}).HashKey(): "tree:findExternal",
+		(&terminal.Event{terminal.Rune, 'q'}).HashKey(): "quit",
+	}
 
-	stop := make(chan bool, 1)
-	t, err := terminal.InitTerm(terminal.Callbacks{
-		ChangeCursor: state.ChangeCursor,
-		Prev: func() {
-			p := treeView.GetPrevPath()
-			state.ChangeCursor(p)
-			state.ChangeScroll(treeView.ScrollForPath(p))
-		},
-		Next: func() {
-			p := treeView.GetNextPath()
-			state.ChangeCursor(p)
-			state.ChangeScroll(treeView.ScrollForPath(p))
-		},
-		Open:      func() { state.SetExpansion(state.Cursor, true) },
-		Close:     func() { state.SetExpansion(state.Cursor, false) },
-		Toggle:    func() { state.ToggleExpansion(state.Cursor) },
-		ToggleAll: func() { state.ToggleExpansionAll(state.Cursor) },
-		OpenAll:   func() { state.SetExpansionAll(state.Cursor, true) },
-		CloseAll:  func() { state.SetExpansionAll(state.Cursor, false) },
-		Up:        func() { state.MoveCursorToParent() },
-		Quit:      func() { stop <- true },
-	})
+	t, err := terminal.OpenTerm()
 	if err != nil {
 		panic(err)
 	}
 	defer t.Close()
-	err = t.StartLoop(views, stop)
+	err = t.StartLoop(bindings, views)
 	if err != nil {
 		panic(err)
 	}

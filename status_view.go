@@ -26,7 +26,11 @@ func (v *StatusView) ShouldRender() bool {
 }
 
 func (v *StatusView) Render(p term.Position) []term.Line {
-	line := term.NewLine(&term.Graphics{Reverse: true}, p.Cols)
+	line := term.NewLine(&term.Graphics{}, p.Cols)
 	line.Append("", &term.Graphics{})
 	return []term.Line{line}
+}
+
+func (v *StatusView) GetCommands() map[string]term.Command {
+	return map[string]term.Command{}
 }
