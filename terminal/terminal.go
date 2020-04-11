@@ -8,23 +8,9 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime/debug"
-	"strconv"
 	"strings"
 
 	"go.uber.org/zap"
-)
-
-const (
-	escape         = "\x1b["
-	high           = "h"
-	low            = "l"
-	altbuf         = "?1049"
-	cursor         = "?25"
-	termclear      = "2J"
-	clearline      = "2K"
-	cursorDown     = "B"
-	cursorLeft     = "D"
-	cursorPosition = "H"
 )
 
 type Terminal struct {
@@ -64,15 +50,15 @@ func (t *Terminal) initTerm() error {
 		return err
 	}
 
-	t.out.WriteString(escape + altbuf + high)
-	t.out.WriteString(escape + cursor + low)
+	t.out.WriteString(enableAltBuf)
+	t.out.WriteString(hideCursor)
 	return nil
 }
 
 func (t *Terminal) revertTerm() {
-	t.out.WriteString(escape + altbuf + high)
-	t.out.WriteString(escape + altbuf + low)
-	t.out.WriteString(escape + cursor + high)
+	t.out.WriteString(enableAltBuf)
+	t.out.WriteString(disableAltBuf)
+	t.out.WriteString(showCursor)
 	sys.IoctlSetTermios(1, sys.TIOCSETA, &t.originalTermios)
 }
 
@@ -82,25 +68,21 @@ func (t *Terminal) Close() {
 	t.out.Close()
 }
 
-func moveTo(row int, col int) string {
-	return escape + strconv.Itoa(row) + and + strconv.Itoa(col) + cursorPosition
-}
-
 func (t *Terminal) drawBorder(p Position) {
 	if p.Rows < 2 || p.Cols < 2 {
 		return
 	}
-	t.out.WriteString(moveTo(p.Top, p.Left))
+	t.out.WriteString(cursorPosition(p.Top, p.Left))
 	t.out.WriteString("┌" + strings.Repeat("─", p.Cols-2) + "┐")
 	for i := 1; i < p.Rows-1; i++ {
-		t.out.WriteString(moveTo(p.Top+i, p.Left+p.Cols-1))
+		t.out.WriteString(cursorPosition(p.Top+i, p.Left+p.Cols-1))
 		t.out.WriteString("│")
 	}
 	for i := 1; i < p.Rows-1; i++ {
-		t.out.WriteString(moveTo(p.Top+i, p.Left))
+		t.out.WriteString(cursorPosition(p.Top+i, p.Left))
 		t.out.WriteString("│")
 	}
-	t.out.WriteString(moveTo(p.Top+p.Rows-1, p.Left))
+	t.out.WriteString(cursorPosition(p.Top+p.Rows-1, p.Left))
 	t.out.WriteString("└" + strings.Repeat("─", p.Cols-2) + "┘")
 }
 
@@ -118,7 +100,7 @@ func (t *Terminal) render(views []View) {
 
 		lines := view.Render(p)
 		for row := 0; row < p.Rows; row++ {
-			t.out.WriteString(moveTo(p.Top+row, p.Left))
+			t.out.WriteString(cursorPosition(p.Top+row, p.Left))
 			if row < len(lines) {
 				t.out.WriteString(lines[row].Text())
 				t.out.WriteString(strings.Repeat(" ", p.Cols-lines[row].Length()))
