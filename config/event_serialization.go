@@ -15,7 +15,7 @@ func init() {
 		"ctrl-space":        &term.Event{Symbol: term.CtrlSpace},
 		"tab":               &term.Event{Symbol: term.Tab},
 		"enter":             &term.Event{Symbol: term.Enter},
-		"esc":               &term.Event{Symbol: term.ESC},
+		"esc":               &term.Event{Symbol: term.Escape},
 		"ctrl-backslash":    &term.Event{Symbol: term.CtrlBackslash},
 		"ctrl-rightbracket": &term.Event{Symbol: term.CtrlRightBracket},
 		"ctrl-caret":        &term.Event{Symbol: term.CtrlCaret},

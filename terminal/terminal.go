@@ -160,8 +160,9 @@ func (t *Terminal) StartLoop(bindings map[string][]string, views []View) (err er
 	winChSig := make(chan os.Signal, 1)
 	signal.Notify(winChSig, sys.SIGWINCH)
 
-	events := make(chan Event, 1)
-	go sendEventsLoop(t.in, events)
+	events := make(chan Event)
+	eventReadDone := make(chan bool)
+	go readEvents(t.in, events, eventReadDone)
 
 	err = t.fetchWinSize()
 	if err != nil {
@@ -179,6 +180,8 @@ func (t *Terminal) StartLoop(bindings map[string][]string, views []View) (err er
 			t.fetchWinSize()
 			t.render(views)
 			zap.L().Debug("Rerendered.")
+		case <-eventReadDone:
+			go readEvents(t.in, events, eventReadDone)
 		case event := <-events:
 			zap.L().Sugar().Debug("Event: ", event)
 			cmdKeys, ok := bindings[event.HashKey()]

@@ -37,7 +37,7 @@ const (
 	CtrlX
 	CtrlY
 	CtrlZ
-	ESC
+	Escape
 	CtrlBackslash
 	CtrlRightBracket
 	CtrlCaret
@@ -79,17 +79,17 @@ func (e *Event) HashKey() string {
 	}
 }
 
-func cmp(a []byte, b []byte) bool {
-	if (a == nil) != (b == nil) {
+func hasPrefix(s []byte, prefix []byte) bool {
+	if (s == nil) != (prefix == nil) {
 		return false
 	}
 
-	if len(a) != len(b) {
+	if len(s) < len(prefix) {
 		return false
 	}
 
-	for i := range a {
-		if a[i] != b[i] {
+	for i := range prefix {
+		if s[i] != prefix[i] {
 			return false
 		}
 	}
@@ -97,37 +97,60 @@ func cmp(a []byte, b []byte) bool {
 	return true
 }
 
-func sendEventsLoop(r io.Reader, out chan Event) {
-	for {
-		in := make([]byte, 128)
-		n, err := r.Read(in)
-		if err != nil {
-			continue
-		}
-		in = in[:n]
-		zap.L().Sugar().Debug("Input bytes: ", in)
+func readEvents(r io.Reader, out chan Event, done chan bool) {
+	defer func() { done <- true }()
+	in := make([]byte, 128)
+	n, err := r.Read(in)
+	if err != nil {
+		return
+	}
+	in = in[:n]
+	zap.L().Sugar().Debug("Input bytes: ", in)
 
-		switch {
-		case len(in) == 1 && in[0] <= 31:
-			out <- Event{Symbol: EventSymbol(in[0])}
-		case len(in) == 1 && in[0] == Del:
-			out <- Event{Symbol: Del}
-		case cmp(in, []byte{27, 91, 65}):
-			out <- Event{Symbol: Up}
-		case cmp(in, []byte{27, 91, 66}):
-			out <- Event{Symbol: Down}
-		case cmp(in, []byte{27, 91, 67}):
-			out <- Event{Symbol: Right}
-		case cmp(in, []byte{27, 91, 68}):
-			out <- Event{Symbol: Left}
-		case cmp(in, []byte{27, 91, 49, 126}):
-			out <- Event{Symbol: Home}
-		case cmp(in, []byte{27, 91, 52, 126}):
-			out <- Event{Symbol: End}
-		default:
-			r, size := utf8.DecodeRune(in)
-			if r != utf8.RuneError && size == len(in) {
+	for len(in) > 0 {
+		if in[0] == Escape {
+			// Literal escape or escape sequences.
+			switch {
+			case in[0] == Escape && (len(in) == 1 || in[1] == Escape):
+				out <- Event{Symbol: Escape}
+				in = in[1:]
+			case hasPrefix(in, []byte{27, 91, 65}):
+				out <- Event{Symbol: Up}
+				in = in[3:]
+			case hasPrefix(in, []byte{27, 91, 66}):
+				out <- Event{Symbol: Down}
+				in = in[3:]
+			case hasPrefix(in, []byte{27, 91, 67}):
+				out <- Event{Symbol: Right}
+				in = in[3:]
+			case hasPrefix(in, []byte{27, 91, 68}):
+				out <- Event{Symbol: Left}
+				in = in[3:]
+			case hasPrefix(in, []byte{27, 91, 49, 126}):
+				out <- Event{Symbol: Home}
+				in = in[4:]
+			case hasPrefix(in, []byte{27, 91, 52, 126}):
+				out <- Event{Symbol: End}
+				in = in[4:]
+			default:
+				// Unhandled entries.
+				in = in[0:0]
+			}
+		} else {
+			r, rSize := utf8.DecodeRune(in)
+			switch {
+			case in[0] <= 31:
+				out <- Event{Symbol: EventSymbol(in[0])}
+				in = in[1:]
+			case in[0] == Del:
+				out <- Event{Symbol: Del}
+				in = in[1:]
+			case r != utf8.RuneError:
 				out <- Event{Symbol: Rune, Value: r}
+				in = in[rSize:]
+			default:
+				// Unhandled entries.
+				in = in[0:0]
 			}
 		}
 	}
