@@ -7,10 +7,10 @@ import (
 )
 
 type Tree struct {
-	path       string
+	Path       string
 	info       os.FileInfo
 	targetInfo os.FileInfo
-	Children   []*Tree
+	children   []*Tree
 }
 
 func InitTreeFromWd() (*Tree, error) {
@@ -37,10 +37,14 @@ func InitTree(p string) (*Tree, error) {
 		return nil, err
 	}
 	tree := &Tree{
+		Path: p,
 		info: info,
-		path: ".",
 	}
 	return tree, nil
+}
+
+func (t *Tree) Name() string {
+	return t.info.Name()
 }
 
 func (t *Tree) IsDir() bool {
@@ -51,40 +55,55 @@ func (t *Tree) IsDir() bool {
 	}
 }
 
-func (t *Tree) MaybeExpand() error {
-	if !t.IsDir() || t.Children != nil {
-		return nil
+func (t *Tree) Children() ([]*Tree, error) {
+	if t.children != nil {
+		return t.children, nil
 	}
-	f, err := os.Open(t.path)
+	if !t.IsDir() {
+		return []*Tree{}, nil
+	}
+	f, err := os.Open(t.Path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	contents, err := f.Readdir(0)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, content := range contents {
 		childTree := &Tree{
-			path: path.Join(t.path, content.Name()),
+			Path: path.Join(t.Path, content.Name()),
 			info: content,
 		}
 		if content.Mode()&os.ModeSymlink != 0 {
-			if targetInfo, err := os.Stat(childTree.path); err != nil {
+			if targetInfo, err := os.Stat(childTree.Path); err == nil {
 				childTree.targetInfo = targetInfo
+			} else {
+				return nil, err
 			}
 		}
-		t.Children = append(t.Children, childTree)
+		t.children = append(t.children, childTree)
 	}
-	return nil
+	return append(t.children[:0:0], t.children...), nil
+}
+
+func ByTypeAndName(children []*Tree) func(i, j int) bool {
+	return func(i, j int) bool {
+		if children[i].IsDir() != children[j].IsDir() {
+			return children[i].IsDir()
+		} else {
+			return children[i].Name() < children[j].Name()
+		}
+	}
 }
 
 func (t *Tree) Print(indent string) {
 	fmt.Println(indent + t.info.Name())
-	err := t.MaybeExpand()
+	children, err := t.Children()
 	if err != nil {
 		panic(err)
 	}
-	for _, child := range t.Children {
+	for _, child := range children {
 		child.Print(indent + "  ")
 	}
 }

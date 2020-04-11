@@ -1,51 +1,25 @@
 package main
 
-import (
-	sys "golang.org/x/sys/unix"
-	"os"
-	"os/signal"
-)
-
 func main() {
-	PrintWd()
-
-	t, err := InitTerm()
-	if err != nil {
-		panic(err)
-	}
-
 	tree, err := InitTreeFromWd()
 	if err != nil {
 		panic(err)
 	}
-	state := &AppState{
-		Root: tree,
+	state := AppState{
+		Root:       tree,
+		Cursor:     tree.Path,
+		Expansions: map[string]bool{tree.Path: true},
 	}
-	t.Render(state)
 
-	go func() {
-		for {
-			input := make([]byte, 1)
-			_, err := os.Stdout.Read(input)
-			if err == nil {
-				if input[0] == 'j' {
-					state.CursorLine += 1
-					t.Render(state)
-				} else if input[0] == 'k' {
-					state.CursorLine -= 1
-					t.Render(state)
-				}
-			}
-		}
-	}()
-
-	sigs := make(chan os.Signal, 1)
-	done := make(chan bool, 1)
-	go func() {
-		<-sigs
-		t.Close()
-		done <- true
-	}()
-	signal.Notify(sigs, sys.SIGINT, sys.SIGTERM)
-	<-done
+	stop := make(chan bool, 1)
+	t, err := InitTerm(Callbacks{
+		ChangeCursor:    state.ChangeCursor,
+		ToggleExpansion: state.ToggleExpansion,
+		Quit:            func() { stop <- true },
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer t.Close()
+	t.StartLoop(&state, stop)
 }
