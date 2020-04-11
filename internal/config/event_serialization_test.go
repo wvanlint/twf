@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	term "github.com/wvanlint/twf/terminal"
+	term "github.com/wvanlint/twf/internal/terminal"
 )
 
 func TestEventSerializationSpecialKey(t *testing.T) {

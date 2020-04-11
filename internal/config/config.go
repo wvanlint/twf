@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	term "github.com/wvanlint/twf/terminal"
+	term "github.com/wvanlint/twf/internal/terminal"
 )
 
 type TwfConfig struct {
@@ -108,6 +108,8 @@ func defaultKeybindings() Keybindings {
 	return map[string][]string{
 		(&term.Event{term.Rune, 'j'}).HashKey():     []string{"tree:next"},
 		(&term.Event{term.Rune, 'k'}).HashKey():     []string{"tree:prev"},
+		(&term.Event{Symbol: term.CtrlJ}).HashKey(): []string{"preview:down"},
+		(&term.Event{Symbol: term.CtrlK}).HashKey(): []string{"preview:up"},
 		(&term.Event{term.Rune, 'o'}).HashKey():     []string{"tree:toggle"},
 		(&term.Event{term.Rune, 'O'}).HashKey():     []string{"tree:toggleAll"},
 		(&term.Event{term.Rune, '/'}).HashKey():     []string{"tree:findExternal"},

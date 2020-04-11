@@ -2,10 +2,14 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
-	"github.com/wvanlint/twf/config"
-	"github.com/wvanlint/twf/terminal"
+	"github.com/wvanlint/twf/internal/config"
+	"github.com/wvanlint/twf/internal/filetree"
+	"github.com/wvanlint/twf/internal/state"
+	"github.com/wvanlint/twf/internal/terminal"
+	"github.com/wvanlint/twf/internal/views"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -32,19 +36,24 @@ func main() {
 	zap.ReplaceGlobals(logger)
 
 	zap.L().Info("Starting twf.")
-	tree, err := InitTreeFromWd()
+
+	wd, err := os.Getwd()
 	if err != nil {
 		panic(err)
 	}
-	state := AppState{
+	tree, err := filetree.InitFileTree(wd)
+	if err != nil {
+		panic(err)
+	}
+	state := state.State{
 		Root:       tree,
-		Cursor:     tree.Path,
-		Expansions: map[string]bool{tree.Path: true},
+		Cursor:     tree.AbsPath,
+		Expansions: map[string]bool{tree.AbsPath: true},
 	}
 	views := []terminal.View{
-		NewTreeView(config, &state),
-		NewPreviewView(config, &state),
-		NewStatusView(config, &state),
+		views.NewTreeView(config, &state),
+		views.NewPreviewView(config, &state),
+		views.NewStatusView(config, &state),
 	}
 
 	t, err := terminal.OpenTerm(&config.Terminal)
@@ -52,10 +61,10 @@ func main() {
 		panic(err)
 	}
 	err = t.StartLoop(config.Keybindings, views)
+	t.Close()
 	if err != nil {
 		panic(err)
 	}
-	t.Close()
 
 	fmt.Println(strings.Join(state.Selection, "\n"))
 	zap.L().Info("Stopping twf.")

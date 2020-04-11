@@ -1,16 +1,17 @@
-package main
+package views
 
 import (
-	"github.com/wvanlint/twf/config"
-	term "github.com/wvanlint/twf/terminal"
+	"github.com/wvanlint/twf/internal/config"
+	"github.com/wvanlint/twf/internal/state"
+	term "github.com/wvanlint/twf/internal/terminal"
 )
 
 type statusView struct {
 	config *config.TwfConfig
-	state  *AppState
+	state  *state.State
 }
 
-func NewStatusView(config *config.TwfConfig, state *AppState) term.View {
+func NewStatusView(config *config.TwfConfig, state *state.State) term.View {
 	return &statusView{
 		config: config,
 		state:  state,

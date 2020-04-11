@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"unicode/utf8"
 
-	term "github.com/wvanlint/twf/terminal"
+	term "github.com/wvanlint/twf/internal/terminal"
 )
 
 var strToEventM map[string]*term.Event

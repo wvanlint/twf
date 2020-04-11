@@ -3,6 +3,7 @@ package terminal
 import (
 	"regexp"
 	"strings"
+	"unicode/utf8"
 )
 
 var escapeRegex *regexp.Regexp
@@ -33,14 +34,18 @@ func (l *line) Append(s string, graphics *Graphics) Line {
 	if l.length >= l.maxLength {
 		return l
 	}
-	if l.length+len(s) > l.maxLength {
-		s = s[:l.maxLength-l.length]
-	}
-	l.length += len(s)
 	if graphics != nil {
 		l.line.WriteString(graphics.ToEscapeCode())
 	}
-	l.line.WriteString(s)
+	for len(s) > 0 && l.length < l.maxLength {
+		r, size := utf8.DecodeRuneInString(s)
+		s = s[size:]
+		if r == utf8.RuneError {
+			continue
+		}
+		l.length += 1
+		l.line.WriteString(string(r))
+	}
 	l.line.WriteString(resetGraphics)
 	l.line.WriteString(l.defaultGraphics.ToEscapeCode())
 	return l
@@ -49,22 +54,27 @@ func (l *line) Append(s string, graphics *Graphics) Line {
 func (l *line) AppendRaw(s string) Line {
 	matches := escapeRegex.FindAllStringIndex(s, -1)
 	prevIndex := 0
-	for i := 0; i < len(matches); i++ {
-		piece := s[prevIndex:matches[i][0]]
-		if l.length+len(piece) > l.maxLength {
-			piece = piece[:l.maxLength-l.length]
+	for i := 0; i < len(matches)+1; i++ {
+		piece := ""
+		if i < len(matches) {
+			piece = s[prevIndex:matches[i][0]]
+		} else {
+			piece = s[prevIndex:]
 		}
-		l.length += len(piece)
-		l.line.WriteString(piece)
-		l.line.WriteString(s[matches[i][0]:matches[i][1]])
-		prevIndex = matches[i][1]
+		for len(piece) > 0 && l.length < l.maxLength {
+			r, size := utf8.DecodeRuneInString(piece)
+			piece = piece[size:]
+			if r == utf8.RuneError || r <= 0x1f || (r >= 0x7f && r <= 0x9f) {
+				continue
+			}
+			l.length += 1
+			l.line.WriteString(string(r))
+		}
+		if i < len(matches) {
+			l.line.WriteString(s[matches[i][0]:matches[i][1]])
+			prevIndex = matches[i][1]
+		}
 	}
-	piece := s[prevIndex:]
-	if l.length+len(piece) > l.maxLength {
-		piece = piece[:l.maxLength-l.length]
-	}
-	l.length += len(piece)
-	l.line.WriteString(piece)
 	l.line.WriteString(resetGraphics)
 	l.line.WriteString(l.defaultGraphics.ToEscapeCode())
 	return l

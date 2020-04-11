@@ -124,7 +124,9 @@ func (t *Terminal) render(views []View) {
 			t.moveTo(p.Top+row, p.Left)
 			if row < len(lines) {
 				t.out.WriteString(lines[row].Text())
-				t.out.WriteString(strings.Repeat(" ", p.Cols-lines[row].Length()))
+				if p.Cols > lines[row].Length() {
+					t.out.WriteString(strings.Repeat(" ", p.Cols-lines[row].Length()))
+				}
 			} else {
 				t.out.WriteString(strings.Repeat(" ", p.Cols))
 			}
