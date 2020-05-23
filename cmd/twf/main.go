@@ -53,6 +53,9 @@ func main() {
 		Cursor:     tree.AbsPath,
 		Expansions: map[string]bool{tree.AbsPath: true},
 	}
+	if config.LocatePath != "" {
+		state.ChangeCursor(config.LocatePath)
+	}
 	views := []terminal.View{
 		views.NewTreeView(config, &state),
 		views.NewPreviewView(config, &state),

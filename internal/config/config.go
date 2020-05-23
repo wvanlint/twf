@@ -9,6 +9,7 @@ import (
 )
 
 type TwfConfig struct {
+	LocatePath  string
 	LogLevel    string
 	Dir         string
 	Preview     PreviewConfig
@@ -108,15 +109,19 @@ func (ks Keybindings) Set(s string) error {
 
 func defaultKeybindings() Keybindings {
 	return map[string][]string{
-		(&term.Event{term.Rune, 'j'}).HashKey():     []string{"tree:next"},
-		(&term.Event{term.Rune, 'k'}).HashKey():     []string{"tree:prev"},
-		(&term.Event{Symbol: term.CtrlJ}).HashKey(): []string{"preview:down"},
-		(&term.Event{Symbol: term.CtrlK}).HashKey(): []string{"preview:up"},
-		(&term.Event{term.Rune, 'o'}).HashKey():     []string{"tree:toggle"},
-		(&term.Event{term.Rune, 'O'}).HashKey():     []string{"tree:toggleAll"},
-		(&term.Event{term.Rune, '/'}).HashKey():     []string{"tree:findExternal"},
-		(&term.Event{term.Rune, 'q'}).HashKey():     []string{"quit"},
-		(&term.Event{Symbol: term.Enter}).HashKey(): []string{"tree:selectPath", "quit"},
+		(&term.Event{term.Rune, 'j'}).HashKey():      []string{"tree:next"},
+		(&term.Event{term.Rune, 'k'}).HashKey():      []string{"tree:prev"},
+		(&term.Event{Symbol: term.CtrlJ}).HashKey():  []string{"preview:down"},
+		(&term.Event{Symbol: term.CtrlK}).HashKey():  []string{"preview:up"},
+		(&term.Event{term.Rune, 'o'}).HashKey():      []string{"tree:toggle"},
+		(&term.Event{term.Rune, 'O'}).HashKey():      []string{"tree:toggleAll"},
+		(&term.Event{term.Rune, 'p'}).HashKey():      []string{"tree:parent"},
+		(&term.Event{term.Rune, 'P'}).HashKey():      []string{"tree:parent", "tree:close"},
+		(&term.Event{term.Rune, '/'}).HashKey():      []string{"tree:findExternal"},
+		(&term.Event{term.Rune, 'q'}).HashKey():      []string{"quit"},
+		(&term.Event{Symbol: term.CtrlC}).HashKey():  []string{"quit"},
+		(&term.Event{Symbol: term.Escape}).HashKey(): []string{"quit"},
+		(&term.Event{Symbol: term.Enter}).HashKey():  []string{"tree:selectPath", "quit"},
 	}
 }
 
@@ -171,5 +176,6 @@ func GetConfig() *TwfConfig {
 		"Graphics per type of text span.",
 	)
 	flag.Parse()
+	config.LocatePath = flag.Arg(0)
 	return &config
 }

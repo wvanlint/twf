@@ -12,7 +12,10 @@ type State struct {
 }
 
 func (s *State) ChangeCursor(path string) {
-	node, _ := s.Root.FindPath(path)
+	node, err := s.Root.FindPath(path)
+	if err != nil {
+		return
+	}
 	s.Cursor = node.AbsPath
 	for node != s.Root {
 		node = node.Parent()
