@@ -75,6 +75,13 @@ func (v *treeView) renderNode(
 		}
 	}
 
+	if node.IsDir() {
+		if value, _ := v.state.Expansions[node.AbsPath]; value {
+			line.Append("▼ ", &graphics)
+		} else {
+			line.Append("▶ ", &graphics)
+		}
+	}
 	line.Append(node.Name(), &graphics)
 	return line
 }
