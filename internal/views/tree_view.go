@@ -147,17 +147,17 @@ func (v *treeView) scrollForPath(path string) int {
 
 func (v *treeView) GetCommands() map[string]term.Command {
 	return map[string]term.Command{
-		"tree:prev":         v.prev,
-		"tree:next":         v.next,
-		"tree:open":         v.open,
-		"tree:close":        v.close,
-		"tree:toggle":       v.toggle,
-		"tree:toggleAll":    v.toggleAll,
-		"tree:openAll":      v.openAll,
-		"tree:closeAll":     v.closeAll,
-		"tree:parent":       v.parent,
-		"tree:findExternal": v.findExternal,
-		"tree:selectPath":   v.selectPath,
+		"tree:prev":           v.prev,
+		"tree:next":           v.next,
+		"tree:open":           v.open,
+		"tree:close":          v.close,
+		"tree:toggle":         v.toggle,
+		"tree:toggleAll":      v.toggleAll,
+		"tree:openAll":        v.openAll,
+		"tree:closeAll":       v.closeAll,
+		"tree:parent":         v.parent,
+		"tree:locateExternal": v.locateExternal,
+		"tree:selectPath":     v.selectPath,
 	}
 }
 
@@ -205,7 +205,7 @@ func (v *treeView) parent(helper term.TerminalHelper, args ...interface{}) {
 	v.state.MoveCursorToParent()
 }
 
-func (v *treeView) findExternal(helper term.TerminalHelper, args ...interface{}) {
-	content, _ := helper.ExecuteInTerminal(v.config.TreeView.FindCommand)
+func (v *treeView) locateExternal(helper term.TerminalHelper, args ...interface{}) {
+	content, _ := helper.ExecuteInTerminal(v.config.TreeView.LocateCommand)
 	v.state.ChangeCursor(strings.TrimSpace(content))
 }

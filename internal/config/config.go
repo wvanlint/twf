@@ -25,7 +25,7 @@ type PreviewConfig struct {
 }
 
 type TreeViewConfig struct {
-	FindCommand string
+	LocateCommand string
 }
 
 type GraphicsMapping map[string]*term.Graphics
@@ -117,7 +117,7 @@ func defaultKeybindings() Keybindings {
 		(&term.Event{term.Rune, 'O'}).HashKey():      []string{"tree:toggleAll"},
 		(&term.Event{term.Rune, 'p'}).HashKey():      []string{"tree:parent"},
 		(&term.Event{term.Rune, 'P'}).HashKey():      []string{"tree:parent", "tree:close"},
-		(&term.Event{term.Rune, '/'}).HashKey():      []string{"tree:findExternal"},
+		(&term.Event{term.Rune, '/'}).HashKey():      []string{"tree:locateExternal"},
 		(&term.Event{term.Rune, 'q'}).HashKey():      []string{"quit"},
 		(&term.Event{Symbol: term.CtrlC}).HashKey():  []string{"quit"},
 		(&term.Event{Symbol: term.Escape}).HashKey(): []string{"quit"},
@@ -152,10 +152,10 @@ func GetConfig() *TwfConfig {
 		"Enable/disable previews.",
 	)
 	flag.StringVar(
-		&config.TreeView.FindCommand,
-		"findCmd",
+		&config.TreeView.LocateCommand,
+		"locateCmd",
 		"fzf",
-		"External command to select a path to locate.",
+		"External command which returns a path to locate.",
 	)
 	flag.Float64Var(
 		&config.Terminal.Height,
@@ -167,7 +167,7 @@ func GetConfig() *TwfConfig {
 	flag.Var(
 		config.Keybindings,
 		"bind",
-		"Keybindings for command sequences",
+		"Keybindings for command sequences.",
 	)
 	config.Graphics = defaultGraphicsMapping()
 	flag.Var(
