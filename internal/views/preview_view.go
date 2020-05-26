@@ -1,6 +1,7 @@
 package views
 
 import (
+	"fmt"
 	"math"
 	"os/exec"
 	"strings"
@@ -50,10 +51,10 @@ func (v *previewView) Render(p term.Position) []term.Line {
 		v.scroll = 0
 
 		preview, err := getPreview(v.config.Preview.PreviewCommand, v.state.Cursor)
-		preview = strings.ReplaceAll(preview, "\t", "    ")
 		if err != nil {
-			panic(err)
+			preview = err.Error()
 		}
+		preview = strings.ReplaceAll(preview, "\t", "    ")
 		v.lastPreview = strings.Split(preview, "\n")
 	}
 
@@ -77,11 +78,16 @@ func (v *previewView) Render(p term.Position) []term.Line {
 
 func getPreview(cmdTemplate string, path string) (string, error) {
 	cmd := strings.ReplaceAll(cmdTemplate, "{}", path)
-	var output strings.Builder
+	var stdout, stderr strings.Builder
 	preview := exec.Command("bash", "-c", cmd)
-	preview.Stdout = &output
+	preview.Stdout = &stdout
+	preview.Stderr = &stderr
 	err := preview.Run()
-	return output.String(), err
+	if err != nil {
+		return stdout.String(), fmt.Errorf("%w %s", err, stderr.String())
+	} else {
+		return stdout.String(), nil
+	}
 }
 
 func (v *previewView) GetCommands() map[string]term.Command {
