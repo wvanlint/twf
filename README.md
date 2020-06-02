@@ -1,7 +1,7 @@
 twf - Tree View Find
 ===
 
-twf is a standalone, tree view explorer inspired by [fzf](https://github.com/junegunn/fzf).
+twf is a standalone tree view explorer inspired by [fzf](https://github.com/junegunn/fzf).
 
 <img src="screenshot.png" width=640>
 
@@ -16,10 +16,17 @@ Features
 Installation
 ------------
 
-Install Go, and ensure the `$GOPATH` is added to the `$PATH`.
+### Using [Homebrew](https://brew.sh/)
 
 ```sh
-brew install go
+brew install --HEAD wvanlint/twf/twf
+```
+
+### Using Go
+
+Install Go, and ensure that `$GOPATH/bin` is added to the `$PATH`.
+
+```sh
 export GOPATH="$HOME/go"
 export PATH="$PATH:$HOME/bin:$GOPATH/bin"
 ```
@@ -27,8 +34,11 @@ export PATH="$PATH:$HOME/bin:$GOPATH/bin"
 Install the Go binary.
 
 ```sh
-go get github.com/wvanlint/twf/cmd/twf
+go get -u github.com/wvanlint/twf/cmd/twf
 ```
+
+Integrations
+------------
 
 ### In .zshrc
 
@@ -103,6 +113,7 @@ For example, you can try the following commands:
 
 ```sh
 cat $(twf)
+cat $(twf --height=0.5)
 vim $(twf)
 ```
 
