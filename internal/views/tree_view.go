@@ -91,6 +91,7 @@ func (v *treeView) Render(p term.Position) []term.Line {
 		v.lineByPath[tree.AbsPath] = len(lines)
 		lines = append(lines, line)
 	})
+	v.scroll = v.scrollForPath(v.state.Cursor.AbsPath)
 	return lines[v.scroll:]
 }
 
@@ -130,7 +131,6 @@ func (v *treeView) prev(helper term.TerminalHelper, args ...interface{}) {
 	if prev != nil {
 		v.state.Cursor = prev
 	}
-	v.scroll = v.scrollForPath(v.state.Cursor.AbsPath)
 }
 
 func (v *treeView) next(helper term.TerminalHelper, args ...interface{}) {
@@ -138,7 +138,6 @@ func (v *treeView) next(helper term.TerminalHelper, args ...interface{}) {
 	if next != nil {
 		v.state.Cursor = next
 	}
-	v.scroll = v.scrollForPath(v.state.Cursor.AbsPath)
 }
 
 func (v *treeView) open(helper term.TerminalHelper, args ...interface{}) {
