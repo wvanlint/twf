@@ -220,7 +220,6 @@ func (t *Terminal) StartLoop(bindings map[string][]string, views []View) (err er
 			cmdKeys, ok := bindings[event.HashKey()]
 			zap.L().Sugar().Debug("Cmds: ", cmdKeys)
 			if !ok {
-				nextEvents <- true
 				continue
 			}
 			for _, cmdKey := range cmdKeys {
@@ -235,8 +234,8 @@ func (t *Terminal) StartLoop(bindings map[string][]string, views []View) (err er
 					}
 				}
 			}
-			nextEvents <- true
 			t.render(views)
+		case nextEvents <- true:
 		}
 		if !t.loop {
 			break
