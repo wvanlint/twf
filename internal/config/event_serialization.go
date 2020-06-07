@@ -26,10 +26,14 @@ func init() {
 		"right":             &term.Event{Symbol: term.Right},
 		"home":              &term.Event{Symbol: term.Home},
 		"end":               &term.Event{Symbol: term.End},
-		"shift-up":          &term.Event{Symbol: term.SUp},
-		"shift-down":        &term.Event{Symbol: term.SDown},
-		"shift-left":        &term.Event{Symbol: term.SLeft},
-		"shift-right":       &term.Event{Symbol: term.SRight},
+		"shift-up":          &term.Event{Symbol: term.ShiftUp},
+		"shift-down":        &term.Event{Symbol: term.ShiftDown},
+		"shift-left":        &term.Event{Symbol: term.ShiftLeft},
+		"shift-right":       &term.Event{Symbol: term.ShiftRight},
+		"ctrl-up":           &term.Event{Symbol: term.CtrlUp},
+		"ctrl-down":         &term.Event{Symbol: term.CtrlDown},
+		"ctrl-left":         &term.Event{Symbol: term.CtrlLeft},
+		"ctrl-right":        &term.Event{Symbol: term.CtrlRight},
 		"del":               &term.Event{Symbol: term.Del},
 	}
 	for i := 0; i < 26; i++ {

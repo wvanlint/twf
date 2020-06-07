@@ -50,10 +50,15 @@ const (
 	Home
 	End
 
-	SUp
-	SDown
-	SLeft
-	SRight
+	ShiftUp
+	ShiftDown
+	ShiftLeft
+	ShiftRight
+
+	CtrlUp
+	CtrlDown
+	CtrlLeft
+	CtrlRight
 
 	Rune
 )
@@ -132,6 +137,30 @@ func readEvents(r io.Reader, out chan Event, next chan bool) {
 				case hasPrefix(in, []byte{27, 91, 52, 126}):
 					out <- Event{Symbol: End}
 					in = in[4:]
+				case hasPrefix(in, []byte{27, 91, 49, 59, 50, 65}):
+					out <- Event{Symbol: ShiftUp}
+					in = in[6:]
+				case hasPrefix(in, []byte{27, 91, 49, 59, 50, 66}):
+					out <- Event{Symbol: ShiftDown}
+					in = in[6:]
+				case hasPrefix(in, []byte{27, 91, 49, 59, 50, 67}):
+					out <- Event{Symbol: ShiftRight}
+					in = in[6:]
+				case hasPrefix(in, []byte{27, 91, 49, 59, 50, 68}):
+					out <- Event{Symbol: ShiftLeft}
+					in = in[6:]
+				case hasPrefix(in, []byte{27, 91, 49, 59, 53, 65}):
+					out <- Event{Symbol: CtrlUp}
+					in = in[6:]
+				case hasPrefix(in, []byte{27, 91, 49, 59, 53, 66}):
+					out <- Event{Symbol: CtrlDown}
+					in = in[6:]
+				case hasPrefix(in, []byte{27, 91, 49, 59, 53, 67}):
+					out <- Event{Symbol: CtrlRight}
+					in = in[6:]
+				case hasPrefix(in, []byte{27, 91, 49, 59, 53, 68}):
+					out <- Event{Symbol: CtrlLeft}
+					in = in[6:]
 				default:
 					// Unhandled entries.
 					in = in[0:0]
