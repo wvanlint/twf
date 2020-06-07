@@ -2,7 +2,6 @@ package views
 
 import (
 	"math"
-	"sort"
 	"strings"
 
 	"github.com/wvanlint/twf/internal/config"
@@ -15,8 +14,6 @@ type treeView struct {
 	config     *config.TwfConfig
 	state      *state.State
 	lineByPath map[string]int
-	paths      []string
-	cursorLine int
 	rows       int
 	scroll     int
 }
@@ -29,8 +26,7 @@ func NewTreeView(config *config.TwfConfig, state *state.State) term.View {
 }
 
 func (v *treeView) Position(totalRows int, totalCols int) term.Position {
-	cursorNode, _ := v.state.Root.FindPath(v.state.Cursor)
-	if v.config.Preview.Enabled && !cursorNode.IsDir() {
+	if v.config.Preview.Enabled && !v.state.Cursor.IsDir() {
 		return term.Position{
 			Top:  1,
 			Left: 1,
@@ -69,14 +65,14 @@ func (v *treeView) renderNode(
 			graphics.Merge(g)
 		}
 	}
-	if node.AbsPath == v.state.Cursor {
+	if node == v.state.Cursor {
 		if g, ok := v.config.Graphics["tree:cursor"]; ok {
 			graphics.Merge(g)
 		}
 	}
 
 	if node.IsDir() {
-		if value, _ := v.state.Expansions[node.AbsPath]; value {
+		if node.Expanded() {
 			line.Append("▼ ", &graphics)
 		} else {
 			line.Append("▶ ", &graphics)
@@ -90,48 +86,12 @@ func (v *treeView) Render(p term.Position) []term.Line {
 	lines := []term.Line{}
 	v.rows = p.Rows
 	v.lineByPath = make(map[string]int)
-	v.paths = []string{}
-	type Item struct {
-		tree  *filetree.FileTree
-		depth int
-	}
-	stack := []Item{Item{v.state.Root, 0}}
-	for len(stack) > 0 {
-		var item Item
-		item, stack = stack[len(stack)-1], stack[:len(stack)-1]
-		line := v.renderNode(item.tree, item.depth, p.Cols)
-		v.lineByPath[item.tree.AbsPath] = len(lines)
-		v.paths = append(v.paths, item.tree.AbsPath)
-		if item.tree.AbsPath == v.state.Cursor {
-			v.cursorLine = len(lines)
-		}
+	v.state.Root.Traverse(true, filetree.ByTypeAndName, func(tree *filetree.FileTree, depth int) {
+		line := v.renderNode(tree, depth, p.Cols)
+		v.lineByPath[tree.AbsPath] = len(lines)
 		lines = append(lines, line)
-
-		if value, _ := v.state.Expansions[item.tree.AbsPath]; value {
-			children, _ := item.tree.Children()
-			sort.Slice(children, filetree.ByTypeAndName(children))
-			for i := len(children) - 1; i >= 0; i-- {
-				stack = append(stack, Item{children[i], item.depth + 1})
-			}
-		}
-	}
+	})
 	return lines[v.scroll:]
-}
-
-func (v *treeView) getNextPath() string {
-	if v.cursorLine == len(v.paths)-1 {
-		return v.paths[len(v.paths)-1]
-	} else {
-		return v.paths[v.cursorLine+1]
-	}
-}
-
-func (v *treeView) getPrevPath() string {
-	if v.cursorLine == 0 {
-		return v.paths[0]
-	} else {
-		return v.paths[v.cursorLine-1]
-	}
 }
 
 func (v *treeView) scrollForPath(path string) int {
@@ -162,50 +122,75 @@ func (v *treeView) GetCommands() map[string]term.Command {
 }
 
 func (v *treeView) selectPath(helper term.TerminalHelper, args ...interface{}) {
-	v.state.AddSelection(v.state.Cursor)
+	v.state.Selection = append(v.state.Selection, v.state.Cursor)
 }
 
 func (v *treeView) prev(helper term.TerminalHelper, args ...interface{}) {
-	p := v.getPrevPath()
-	v.scroll = v.scrollForPath(p)
-	v.state.ChangeCursor(p)
+	prev, _ := v.state.Cursor.Prev(true, filetree.ByTypeAndName)
+	if prev != nil {
+		v.state.Cursor = prev
+	}
+	v.scroll = v.scrollForPath(v.state.Cursor.AbsPath)
 }
 
 func (v *treeView) next(helper term.TerminalHelper, args ...interface{}) {
-	p := v.getNextPath()
-	v.scroll = v.scrollForPath(p)
-	v.state.ChangeCursor(p)
+	next, _ := v.state.Cursor.Next(true, filetree.ByTypeAndName)
+	if next != nil {
+		v.state.Cursor = next
+	}
+	v.scroll = v.scrollForPath(v.state.Cursor.AbsPath)
 }
 
 func (v *treeView) open(helper term.TerminalHelper, args ...interface{}) {
-	v.state.SetExpansion(v.state.Cursor, true)
+	v.state.Cursor.Expand()
 }
 
 func (v *treeView) close(helper term.TerminalHelper, args ...interface{}) {
-	v.state.SetExpansion(v.state.Cursor, false)
+	v.state.Cursor.Collapse()
 }
 
 func (v *treeView) toggle(helper term.TerminalHelper, args ...interface{}) {
-	v.state.ToggleExpansion(v.state.Cursor)
+	if v.state.Cursor.Expanded() {
+		v.state.Cursor.Collapse()
+	} else {
+		v.state.Cursor.Expand()
+	}
 }
 
 func (v *treeView) toggleAll(helper term.TerminalHelper, args ...interface{}) {
-	v.state.ToggleExpansionAll(v.state.Cursor)
+	expanded := v.state.Cursor.Expanded()
+	v.state.Cursor.Traverse(false, nil, func(tree *filetree.FileTree, _ int) {
+		if expanded {
+			tree.Collapse()
+		} else {
+			tree.Expand()
+		}
+	})
 }
 
 func (v *treeView) openAll(helper term.TerminalHelper, args ...interface{}) {
-	v.state.SetExpansionAll(v.state.Cursor, true)
+	v.state.Cursor.Traverse(false, nil, func(tree *filetree.FileTree, _ int) {
+		tree.Expand()
+	})
 }
 
 func (v *treeView) closeAll(helper term.TerminalHelper, args ...interface{}) {
-	v.state.SetExpansionAll(v.state.Cursor, false)
+	v.state.Cursor.Traverse(false, nil, func(tree *filetree.FileTree, _ int) {
+		tree.Collapse()
+	})
 }
 
 func (v *treeView) parent(helper term.TerminalHelper, args ...interface{}) {
-	v.state.MoveCursorToParent()
+	parent := v.state.Cursor.Parent()
+	if parent != nil {
+		v.state.Cursor = parent
+	}
 }
 
 func (v *treeView) locateExternal(helper term.TerminalHelper, args ...interface{}) {
 	content, _ := helper.ExecuteInTerminal(v.config.TreeView.LocateCommand)
-	v.state.ChangeCursor(strings.TrimSpace(content))
+	node, _ := v.state.Root.FindPath(strings.TrimSpace(content))
+	if node != nil {
+		v.state.Cursor = node
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 type FileTree struct {
@@ -13,6 +14,7 @@ type FileTree struct {
 	parent         *FileTree
 	children       []*FileTree
 	childrenByName map[string]*FileTree
+	expanded       bool
 }
 
 func InitFileTree(p string) (*FileTree, error) {
@@ -52,6 +54,18 @@ func (t *FileTree) Parent() *FileTree {
 	return t.parent
 }
 
+func (t *FileTree) Expanded() bool {
+	return t.expanded
+}
+
+func (t *FileTree) Expand() {
+	t.expanded = true
+}
+
+func (t *FileTree) Collapse() {
+	t.expanded = false
+}
+
 func (t *FileTree) maybeLoadChildren() error {
 	if t.children != nil {
 		return nil
@@ -65,6 +79,7 @@ func (t *FileTree) maybeLoadChildren() error {
 	if err != nil {
 		return err
 	}
+	defer f.Close()
 	contents, err := f.Readdir(0)
 	if err != nil {
 		return err
@@ -88,11 +103,15 @@ func (t *FileTree) maybeLoadChildren() error {
 	return nil
 }
 
-func (t *FileTree) Children() ([]*FileTree, error) {
+func (t *FileTree) Children(order Order) ([]*FileTree, error) {
 	if err := t.maybeLoadChildren(); err != nil {
 		return nil, err
 	}
-	return append(t.children[:0:0], t.children...), nil
+	children := append(t.children[:0:0], t.children...)
+	if order != nil {
+		sort.Slice(children, order(children))
+	}
+	return children, nil
 }
 
 type PathNotFound struct {
@@ -120,7 +139,10 @@ func (t *FileTree) FindPath(origPath string) (*FileTree, error) {
 	currentNode := t
 	var ok bool
 	for _, part := range parts {
-		currentNode.maybeLoadChildren()
+		err := currentNode.maybeLoadChildren()
+		if err != nil {
+			return nil, err
+		}
 		currentNode, ok = currentNode.childrenByName[part]
 		if !ok {
 			return nil, PathNotFound{origPath}
@@ -129,20 +151,92 @@ func (t *FileTree) FindPath(origPath string) (*FileTree, error) {
 	return currentNode, nil
 }
 
-func (t *FileTree) Traverse(f func(*FileTree)) error {
-	queue := []*FileTree{t}
-	var item *FileTree
-	for len(queue) > 0 {
-		item, queue = queue[0], queue[1:]
-		f(item)
-		children, err := item.Children()
-		if err != nil {
-			return err
+func (t *FileTree) Traverse(visibleOnly bool, order Order, f func(*FileTree, int)) error {
+	type treeWithDepth struct {
+		tree  *FileTree
+		depth int
+	}
+	stack := []treeWithDepth{treeWithDepth{t, 0}}
+	for len(stack) > 0 {
+		var current treeWithDepth
+		current, stack = stack[len(stack)-1], stack[:len(stack)-1]
+		f(current.tree, current.depth)
+
+		if !visibleOnly || current.tree.Expanded() {
+			children, err := current.tree.Children(order)
+			if err != nil {
+				return err
+			}
+			for i := len(children) - 1; i >= 0; i-- {
+				stack = append(stack, treeWithDepth{children[i], current.depth + 1})
+			}
 		}
-		queue = append(queue, children...)
 	}
 	return nil
 }
+
+func (t *FileTree) Prev(visibleOnly bool, order Order) (*FileTree, error) {
+	if t.Parent() == nil {
+		return nil, nil
+	}
+	siblings, err := t.Parent().Children(order)
+	if err != nil {
+		return nil, err
+	}
+	if t == siblings[0] {
+		return t.Parent(), nil
+	}
+	var prevSibling *FileTree
+	for i, sibling := range siblings {
+		if sibling == t {
+			prevSibling = siblings[i-1]
+		}
+	}
+	node := prevSibling
+	for {
+		if !node.Expanded() && visibleOnly {
+			return node, nil
+		}
+		children, err := node.Children(order)
+		if err != nil {
+			return nil, err
+		}
+		if len(children) == 0 {
+			return node, nil
+		} else {
+			node = children[len(children)-1]
+		}
+	}
+	return nil, nil
+}
+
+func (t *FileTree) Next(visibleOnly bool, order Order) (*FileTree, error) {
+	if t.Expanded() || !visibleOnly {
+		children, err := t.Children(order)
+		if err != nil {
+			return nil, err
+		}
+		if len(children) > 0 {
+			return children[0], nil
+		}
+	}
+	node := t
+	for node.Parent() != nil {
+		siblings, err := node.Parent().Children(order)
+		if err != nil {
+			return nil, err
+		}
+		for i, sibling := range siblings {
+			if sibling == node && i < len(siblings)-1 {
+				return siblings[i+1], nil
+			}
+		}
+		node = node.Parent()
+	}
+	return nil, nil
+}
+
+type Order func([]*FileTree) func(i, j int) bool
 
 func ByTypeAndName(children []*FileTree) func(i, j int) bool {
 	return func(i, j int) bool {

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/wvanlint/twf/internal/config"
 	"github.com/wvanlint/twf/internal/filetree"
@@ -48,13 +47,16 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	tree.Expand()
 	state := state.State{
-		Root:       tree,
-		Cursor:     tree.AbsPath,
-		Expansions: map[string]bool{tree.AbsPath: true},
+		Root:   tree,
+		Cursor: tree,
 	}
 	if config.LocatePath != "" {
-		state.ChangeCursor(config.LocatePath)
+		located, _ := tree.FindPath(config.LocatePath)
+		if located != nil {
+			state.Cursor = located
+		}
 	}
 	views := []terminal.View{
 		views.NewTreeView(config, &state),
@@ -72,8 +74,8 @@ func main() {
 		panic(err)
 	}
 
-	if len(state.Selection) > 0 {
-		fmt.Println(strings.Join(state.Selection, "\n"))
+	for _, node := range state.Selection {
+		fmt.Println(node.AbsPath)
 	}
 	zap.L().Info("Stopping twf.")
 }

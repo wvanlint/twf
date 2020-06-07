@@ -41,16 +41,15 @@ func (v *previewView) HasBorder() bool {
 }
 
 func (v *previewView) ShouldRender() bool {
-	node, _ := v.state.Root.FindPath(v.state.Cursor)
-	return v.config.Preview.Enabled && !node.IsDir()
+	return v.config.Preview.Enabled && !v.state.Cursor.IsDir()
 }
 
 func (v *previewView) Render(p term.Position) []term.Line {
-	if v.lastPath != v.state.Cursor {
-		v.lastPath = v.state.Cursor
+	if v.lastPath != v.state.Cursor.AbsPath {
+		v.lastPath = v.state.Cursor.AbsPath
 		v.scroll = 0
 
-		preview, err := getPreview(v.config.Preview.PreviewCommand, v.state.Cursor)
+		preview, err := getPreview(v.config.Preview.PreviewCommand, v.state.Cursor.AbsPath)
 		if err != nil {
 			preview = err.Error()
 		}

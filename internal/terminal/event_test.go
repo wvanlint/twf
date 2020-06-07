@@ -15,10 +15,10 @@ func testHelperReadEvent(
 ) {
 	buffer := new(bytes.Buffer)
 	out := make(chan Event)
-	done := make(chan bool)
+	next := make(chan bool)
 
 	buffer.WriteString(input)
-	go readEvents(buffer, out, done)
+	go readEvents(buffer, out, next)
 
 	for _, expected := range expectedEvents {
 		select {
@@ -27,12 +27,6 @@ func testHelperReadEvent(
 		case <-time.After(1 * time.Second):
 			assert.Fail(t, "Timeout")
 		}
-	}
-
-	select {
-	case <-done:
-	case <-time.After(1 * time.Second):
-		assert.Fail(t, "Timeout")
 	}
 }
 
@@ -62,17 +56,6 @@ func TestReadUnicodeEvent(t *testing.T) {
 		"😊",
 		[]Event{
 			Event{Symbol: Rune, Value: '😊'},
-		},
-	)
-}
-
-func TestReadMultipleEvents(t *testing.T) {
-	testHelperReadEvent(
-		t,
-		"ab",
-		[]Event{
-			Event{Symbol: Rune, Value: 'a'},
-			Event{Symbol: Rune, Value: 'b'},
 		},
 	)
 }

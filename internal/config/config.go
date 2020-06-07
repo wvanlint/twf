@@ -111,6 +111,8 @@ func defaultKeybindings() Keybindings {
 	return map[string][]string{
 		(&term.Event{term.Rune, 'j'}).HashKey():      []string{"tree:next"},
 		(&term.Event{term.Rune, 'k'}).HashKey():      []string{"tree:prev"},
+		(&term.Event{term.Rune, 'h'}).HashKey():      []string{"tree:parent", "tree:close"},
+		(&term.Event{term.Rune, 'l'}).HashKey():      []string{"tree:open", "tree:next"},
 		(&term.Event{Symbol: term.CtrlJ}).HashKey():  []string{"preview:down"},
 		(&term.Event{Symbol: term.CtrlK}).HashKey():  []string{"preview:up"},
 		(&term.Event{term.Rune, 'o'}).HashKey():      []string{"tree:toggle"},
