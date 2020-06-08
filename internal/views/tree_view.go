@@ -188,8 +188,5 @@ func (v *treeView) parent(helper term.TerminalHelper, args ...interface{}) {
 
 func (v *treeView) locateExternal(helper term.TerminalHelper, args ...interface{}) {
 	content, _ := helper.ExecuteInTerminal(v.config.TreeView.LocateCommand)
-	node, _ := v.state.Root.FindPath(strings.TrimSpace(content))
-	if node != nil {
-		v.state.Cursor = node
-	}
+	v.state.LocatePath(strings.TrimSpace(content))
 }

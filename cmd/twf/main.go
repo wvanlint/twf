@@ -53,10 +53,7 @@ func main() {
 		Cursor: tree,
 	}
 	if config.LocatePath != "" {
-		located, _ := tree.FindPath(config.LocatePath)
-		if located != nil {
-			state.Cursor = located
-		}
+		state.LocatePath(config.LocatePath)
 	}
 	views := []terminal.View{
 		views.NewTreeView(config, &state),
