@@ -96,12 +96,14 @@ func (v *previewView) GetCommands() map[string]term.Command {
 	}
 }
 
-func (v *previewView) up(helper term.TerminalHelper, args ...interface{}) {
+func (v *previewView) up(helper term.TerminalHelper, args ...interface{}) error {
 	if v.scroll > 0 {
 		v.scroll -= 1
 	}
+	return nil
 }
 
-func (v *previewView) down(helper term.TerminalHelper, args ...interface{}) {
+func (v *previewView) down(helper term.TerminalHelper, args ...interface{}) error {
 	v.scroll += 1
+	return nil
 }

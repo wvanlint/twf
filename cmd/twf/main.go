@@ -47,13 +47,19 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	tree.Expand()
+	err = tree.Expand()
+	if err != nil {
+		panic(err)
+	}
 	state := state.State{
 		Root:   tree,
 		Cursor: tree,
 	}
 	if config.LocatePath != "" {
-		state.LocatePath(config.LocatePath)
+		err = state.LocatePath(config.LocatePath)
+		if err != nil {
+			panic(err)
+		}
 	}
 	views := []terminal.View{
 		views.NewTreeView(config, &state),

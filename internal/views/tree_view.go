@@ -86,10 +86,11 @@ func (v *treeView) Render(p term.Position) []term.Line {
 	lines := []term.Line{}
 	v.rows = p.Rows
 	v.lineByPath = make(map[string]int)
-	v.state.Root.Traverse(true, filetree.ByTypeAndName, func(tree *filetree.FileTree, depth int) {
+	v.state.Root.Traverse(true, filetree.ByTypeAndName, func(tree *filetree.FileTree, depth int) error {
 		line := v.renderNode(tree, depth, p.Cols)
 		v.lineByPath[tree.AbsPath] = len(lines)
 		lines = append(lines, line)
+		return nil
 	})
 	v.scroll = v.scrollForPath(v.state.Cursor.AbsPath)
 	return lines[v.scroll:]
@@ -122,71 +123,89 @@ func (v *treeView) GetCommands() map[string]term.Command {
 	}
 }
 
-func (v *treeView) selectPath(helper term.TerminalHelper, args ...interface{}) {
+func (v *treeView) selectPath(helper term.TerminalHelper, args ...interface{}) error {
 	v.state.Selection = append(v.state.Selection, v.state.Cursor)
+	return nil
 }
 
-func (v *treeView) prev(helper term.TerminalHelper, args ...interface{}) {
-	prev, _ := v.state.Cursor.Prev(true, filetree.ByTypeAndName)
+func (v *treeView) prev(helper term.TerminalHelper, args ...interface{}) error {
+	prev, err := v.state.Cursor.Prev(true, filetree.ByTypeAndName)
+	if err != nil {
+		return err
+	}
 	if prev != nil {
 		v.state.Cursor = prev
 	}
+	return nil
 }
 
-func (v *treeView) next(helper term.TerminalHelper, args ...interface{}) {
-	next, _ := v.state.Cursor.Next(true, filetree.ByTypeAndName)
+func (v *treeView) next(helper term.TerminalHelper, args ...interface{}) error {
+	next, err := v.state.Cursor.Next(true, filetree.ByTypeAndName)
+	if err != nil {
+		return err
+	}
 	if next != nil {
 		v.state.Cursor = next
 	}
+	return nil
 }
 
-func (v *treeView) open(helper term.TerminalHelper, args ...interface{}) {
-	v.state.Cursor.Expand()
+func (v *treeView) open(helper term.TerminalHelper, args ...interface{}) error {
+	return v.state.Cursor.Expand()
 }
 
-func (v *treeView) close(helper term.TerminalHelper, args ...interface{}) {
+func (v *treeView) close(helper term.TerminalHelper, args ...interface{}) error {
 	v.state.Cursor.Collapse()
+	return nil
 }
 
-func (v *treeView) toggle(helper term.TerminalHelper, args ...interface{}) {
+func (v *treeView) toggle(helper term.TerminalHelper, args ...interface{}) error {
 	if v.state.Cursor.Expanded() {
 		v.state.Cursor.Collapse()
+		return nil
 	} else {
-		v.state.Cursor.Expand()
+		return v.state.Cursor.Expand()
 	}
 }
 
-func (v *treeView) toggleAll(helper term.TerminalHelper, args ...interface{}) {
+func (v *treeView) toggleAll(helper term.TerminalHelper, args ...interface{}) error {
 	expanded := v.state.Cursor.Expanded()
-	v.state.Cursor.Traverse(false, nil, func(tree *filetree.FileTree, _ int) {
+	return v.state.Cursor.Traverse(false, nil, func(tree *filetree.FileTree, _ int) error {
 		if expanded {
 			tree.Collapse()
+			return nil
 		} else {
-			tree.Expand()
+			return tree.Expand()
 		}
 	})
 }
 
-func (v *treeView) openAll(helper term.TerminalHelper, args ...interface{}) {
-	v.state.Cursor.Traverse(false, nil, func(tree *filetree.FileTree, _ int) {
-		tree.Expand()
+func (v *treeView) openAll(helper term.TerminalHelper, args ...interface{}) error {
+	return v.state.Cursor.Traverse(false, nil, func(tree *filetree.FileTree, _ int) error {
+		return tree.Expand()
 	})
 }
 
-func (v *treeView) closeAll(helper term.TerminalHelper, args ...interface{}) {
-	v.state.Cursor.Traverse(false, nil, func(tree *filetree.FileTree, _ int) {
+func (v *treeView) closeAll(helper term.TerminalHelper, args ...interface{}) error {
+	return v.state.Cursor.Traverse(false, nil, func(tree *filetree.FileTree, _ int) error {
 		tree.Collapse()
+		return nil
 	})
 }
 
-func (v *treeView) parent(helper term.TerminalHelper, args ...interface{}) {
+func (v *treeView) parent(helper term.TerminalHelper, args ...interface{}) error {
 	parent := v.state.Cursor.Parent()
 	if parent != nil {
 		v.state.Cursor = parent
 	}
+	return nil
 }
 
-func (v *treeView) locateExternal(helper term.TerminalHelper, args ...interface{}) {
-	content, _ := helper.ExecuteInTerminal(v.config.TreeView.LocateCommand)
+func (v *treeView) locateExternal(helper term.TerminalHelper, args ...interface{}) error {
+	content, err := helper.ExecuteInTerminal(v.config.TreeView.LocateCommand)
+	if err != nil {
+		return err
+	}
 	v.state.LocatePath(strings.TrimSpace(content))
+	return nil
 }

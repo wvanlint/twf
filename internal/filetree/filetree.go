@@ -1,6 +1,7 @@
 package filetree
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -58,8 +59,9 @@ func (t *FileTree) Expanded() bool {
 	return t.expanded
 }
 
-func (t *FileTree) Expand() {
+func (t *FileTree) Expand() error {
 	t.expanded = true
+	return t.maybeLoadChildren()
 }
 
 func (t *FileTree) Collapse() {
@@ -77,7 +79,11 @@ func (t *FileTree) maybeLoadChildren() error {
 	}
 	f, err := os.Open(t.AbsPath)
 	if err != nil {
-		return err
+		if errors.Is(err, os.ErrPermission) {
+			return nil
+		} else {
+			return err
+		}
 	}
 	defer f.Close()
 	contents, err := f.Readdir(0)
@@ -93,8 +99,19 @@ func (t *FileTree) maybeLoadChildren() error {
 		if content.Mode()&os.ModeSymlink != 0 {
 			if targetInfo, err := os.Stat(childFileTree.AbsPath); err == nil {
 				childFileTree.targetInfo = targetInfo
+				cycleFound := false
+				for node := childFileTree; node.Parent() != nil; node = node.Parent() {
+					if os.SameFile(node.targetInfo, targetInfo) ||
+						os.SameFile(node.info, targetInfo) {
+						cycleFound = true
+						break
+					}
+				}
+				if cycleFound {
+					continue
+				}
 			} else {
-				return err
+				continue
 			}
 		}
 		t.children = append(t.children, childFileTree)
@@ -104,7 +121,8 @@ func (t *FileTree) maybeLoadChildren() error {
 }
 
 func (t *FileTree) Children(order Order) ([]*FileTree, error) {
-	if err := t.maybeLoadChildren(); err != nil {
+	err := t.maybeLoadChildren()
+	if err != nil {
 		return nil, err
 	}
 	children := append(t.children[:0:0], t.children...)
@@ -151,7 +169,7 @@ func (t *FileTree) FindPath(origPath string) (*FileTree, error) {
 	return currentNode, nil
 }
 
-func (t *FileTree) Traverse(visibleOnly bool, order Order, f func(*FileTree, int)) error {
+func (t *FileTree) Traverse(visibleOnly bool, order Order, f func(*FileTree, int) error) error {
 	type treeWithDepth struct {
 		tree  *FileTree
 		depth int
@@ -160,7 +178,10 @@ func (t *FileTree) Traverse(visibleOnly bool, order Order, f func(*FileTree, int
 	for len(stack) > 0 {
 		var current treeWithDepth
 		current, stack = stack[len(stack)-1], stack[:len(stack)-1]
-		f(current.tree, current.depth)
+		err := f(current.tree, current.depth)
+		if err != nil {
+			return err
+		}
 
 		if !visibleOnly || current.tree.Expanded() {
 			children, err := current.tree.Children(order)

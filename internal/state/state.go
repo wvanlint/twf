@@ -18,7 +18,10 @@ func (s *State) LocatePath(path string) error {
 	s.Cursor = node
 	for node.Parent() != nil {
 		node = node.Parent()
-		node.Expand()
+		err = node.Expand()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

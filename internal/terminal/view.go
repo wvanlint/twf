@@ -8,7 +8,7 @@ type View interface {
 	GetCommands() map[string]Command
 }
 
-type Command func(helper TerminalHelper, args ...interface{})
+type Command func(helper TerminalHelper, args ...interface{}) error
 
 type TerminalHelper interface {
 	ExecuteInTerminal(string) (string, error)

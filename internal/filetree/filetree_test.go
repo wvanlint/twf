@@ -60,8 +60,9 @@ func TestTraverse(t *testing.T) {
 	names := []string{}
 	root, err := InitFileTree("testdata")
 	assert.Nil(t, err)
-	err = root.Traverse(false, nil, func(node *FileTree, _ int) {
+	err = root.Traverse(false, nil, func(node *FileTree, _ int) error {
 		names = append(names, node.Name())
+		return nil
 	})
 	assert.ElementsMatch(t, []string{"testdata", "dir1", "dir2", "a", "b", "c"}, names)
 }
@@ -70,8 +71,9 @@ func TestByTypeAndName(t *testing.T) {
 	nodes := []*FileTree{}
 	root, err := InitFileTree("testdata")
 	assert.Nil(t, err)
-	err = root.Traverse(false, nil, func(node *FileTree, _ int) {
+	err = root.Traverse(false, nil, func(node *FileTree, _ int) error {
 		nodes = append(nodes, node)
+		return nil
 	})
 	sort.Slice(nodes, ByTypeAndName(nodes))
 	names := []string{}

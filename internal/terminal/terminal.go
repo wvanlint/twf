@@ -184,7 +184,7 @@ func (t *Terminal) fetchWinSize() error {
 func (t *Terminal) StartLoop(bindings map[string][]string, views []View) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("Terminal: %v, stacktrace: %s", r, string(debug.Stack()))
+			err = fmt.Errorf("Terminal error: %v, stacktrace: %s", r, string(debug.Stack()))
 		}
 	}()
 
@@ -224,11 +224,17 @@ func (t *Terminal) StartLoop(bindings map[string][]string, views []View) (err er
 			}
 			for _, cmdKey := range cmdKeys {
 				if cmd, ok := t.getCommands()[cmdKey]; ok {
-					cmd(t)
+					err := cmd(t)
+					if err != nil {
+						return err
+					}
 				} else {
 					for _, view := range views {
 						if cmd, ok := view.GetCommands()[cmdKey]; ok {
-							cmd(t)
+							err := cmd(t)
+							if err != nil {
+								return err
+							}
 							break
 						}
 					}
@@ -246,8 +252,9 @@ func (t *Terminal) StartLoop(bindings map[string][]string, views []View) (err er
 
 func (t *Terminal) getCommands() map[string]Command {
 	return map[string]Command{
-		"quit": func(_ TerminalHelper, args ...interface{}) {
+		"quit": func(_ TerminalHelper, args ...interface{}) error {
 			t.loop = false
+			return nil
 		},
 	}
 }
