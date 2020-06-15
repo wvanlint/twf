@@ -166,7 +166,7 @@ twf path/to/subdir/file
   <color>           = <R><G><B>  # In hexadecimal
   ```
 - `-height <float>`: Proportion (between 0.0 and 1.0) of the vertical space of the terminal to take up. If equal to 1.0, an alternative buffer will be used.
-- `-locateCmd <str>`: The command whose output will be interpreted as a path to locate in the file tree.
-- `-loglevel <level>`: Logging priority. Empty disables logging. Follows the the notation [here](https://godoc.org/go.uber.org/zap/zapcore#Level.UnmarshalText).
+- `-locateCmd <str>`: The command whose output will be interpreted as a path to locate in the file tree, when called via the '/' key binding.
+- `-loglevel <level>`: Logging priority. Empty disables logging. Follows the notation [here](https://godoc.org/go.uber.org/zap/zapcore#Level.UnmarshalText).
 - `-preview <bool>`: Enable/disable previews.
 - `-previewCmd <str>`: Command to create preview of a file. The sequence `{}` serves as a placeholder for the path to preview.
