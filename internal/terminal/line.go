@@ -1,15 +1,17 @@
 package terminal
 
 import (
+	"golang.org/x/text/width"
 	"regexp"
 	"strings"
 	"unicode/utf8"
 )
 
-var escapeRegex *regexp.Regexp
+var escapeRegex, graphicsEscapeRegex *regexp.Regexp
 
 func init() {
 	escapeRegex = regexp.MustCompile("\x1b\\[[0-9;]*[a-zA-Z]")
+	graphicsEscapeRegex = regexp.MustCompile("\x1b\\[[0-9;]*m")
 }
 
 type Line interface {
@@ -30,6 +32,27 @@ func NewLine(defaultGraphics *Graphics, maxLength int) Line {
 	return &line{defaultGraphics: defaultGraphics, maxLength: maxLength}
 }
 
+func (l *line) appendText(s string) {
+	for len(s) > 0 && l.length < l.maxLength {
+		r, size := utf8.DecodeRuneInString(s)
+		s = s[size:]
+		if r == utf8.RuneError || r <= 0x1f || (r >= 0x7f && r <= 0x9f) {
+			continue
+		}
+		runeKind := width.LookupRune(r).Kind()
+		if runeKind == width.Neutral || runeKind == width.EastAsianNarrow {
+			l.length += 1
+		} else {
+			if l.length+2 <= l.maxLength {
+				l.length += 2
+			} else {
+				break
+			}
+		}
+		l.line.WriteString(string(r))
+	}
+}
+
 func (l *line) Append(s string, graphics *Graphics) Line {
 	if l.length >= l.maxLength {
 		return l
@@ -37,15 +60,7 @@ func (l *line) Append(s string, graphics *Graphics) Line {
 	if graphics != nil {
 		l.line.WriteString(graphics.ToEscapeCode())
 	}
-	for len(s) > 0 && l.length < l.maxLength {
-		r, size := utf8.DecodeRuneInString(s)
-		s = s[size:]
-		if r == utf8.RuneError {
-			continue
-		}
-		l.length += 1
-		l.line.WriteString(string(r))
-	}
+	l.appendText(s)
 	l.line.WriteString(resetGraphics)
 	l.line.WriteString(l.defaultGraphics.ToEscapeCode())
 	return l
@@ -61,17 +76,12 @@ func (l *line) AppendRaw(s string) Line {
 		} else {
 			piece = s[prevIndex:]
 		}
-		for len(piece) > 0 && l.length < l.maxLength {
-			r, size := utf8.DecodeRuneInString(piece)
-			piece = piece[size:]
-			if r == utf8.RuneError || r <= 0x1f || (r >= 0x7f && r <= 0x9f) {
-				continue
-			}
-			l.length += 1
-			l.line.WriteString(string(r))
-		}
+		l.appendText(piece)
 		if i < len(matches) {
-			l.line.WriteString(s[matches[i][0]:matches[i][1]])
+			escapeCode := s[matches[i][0]:matches[i][1]]
+			if graphicsEscapeRegex.MatchString(escapeCode) {
+				l.line.WriteString(escapeCode)
+			}
 			prevIndex = matches[i][1]
 		}
 	}

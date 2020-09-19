@@ -29,12 +29,24 @@ func TestLineAppendRaw(t *testing.T) {
 	assert.Equal(t, "\x1b[44mab\x1b[m\x1b[7m", line.Text())
 }
 
-func TestLineUnicode(t *testing.T) {
+func TestLineNarrowUnicode(t *testing.T) {
 	line := NewLine(
 		&Graphics{Reverse: true},
 		2,
 	)
 
-	line.Append("😊", nil)
+	line.Append("›", nil)
 	assert.Equal(t, 1, line.Length())
+}
+
+func TestLineWideUnicode(t *testing.T) {
+	line := NewLine(
+		&Graphics{Reverse: true},
+		3,
+	)
+
+	line.Append("😊", nil)
+	assert.Equal(t, 2, line.Length())
+	line.Append("😊", nil)
+	assert.Equal(t, 2, line.Length())
 }
