@@ -9,14 +9,16 @@ import (
 )
 
 type TwfConfig struct {
-	LocatePath  string
-	LogLevel    string
-	Dir         string
-	Preview     PreviewConfig
-	TreeView    TreeViewConfig
-	Terminal    term.TerminalConfig
-	Graphics    GraphicsMapping
-	Keybindings Keybindings
+	LocatePath       string
+	LogLevel         string
+	Dir              string
+	Preview          PreviewConfig
+	TreeView         TreeViewConfig
+	Terminal         term.TerminalConfig
+	Graphics         GraphicsMapping
+	Keybindings      Keybindings
+	AutoexpandDepth  int
+	AutoexpandIgnore string
 }
 
 type PreviewConfig struct {
@@ -152,6 +154,18 @@ func GetConfig() *TwfConfig {
 		"preview",
 		true,
 		"Enable/disable previews.",
+	)
+	flag.IntVar(
+		&config.AutoexpandDepth,
+		"autoexpandDepth",
+		1,
+		"Depth to which directories should be automatically expanded at startup. -1 is unlimited.",
+	)
+	flag.StringVar(
+		&config.AutoexpandIgnore,
+		"autoexpandIgnore",
+		"",
+		"Regular expression matching relative paths to ignore when auto-expanding directories at startup.",
 	)
 	flag.StringVar(
 		&config.TreeView.LocateCommand,

@@ -138,6 +138,11 @@ twf path/to/subdir/file
 
 ### Flags
 
+- `-autoexpandDepth <depth>`: Depth to which directories should be automatically expanded at startup. If `-1`, depth is unlimited. The default is `1`, meaning only the root should be expanded.
+- `-autoexpandIgnore <regexp>`: Regular expression matching relative paths to ignore when auto-expanding directories at startup.
+
+  For example, `^\.git|internal/filetree/testdata$` would ignore the `.git` directory at the root level as well as the `internal/filetree/testdata` directory.
+
 - `-bind <keybindings>`: Keybindings for command sequences.
 
   This takes the following format:
