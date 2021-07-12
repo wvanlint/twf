@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/wvanlint/twf/internal/config"
 	"github.com/wvanlint/twf/internal/filetree"
@@ -47,13 +48,20 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	err = tree.Expand()
-	if err != nil {
-		panic(err)
-	}
 	state := state.State{
 		Root:   tree,
 		Cursor: tree,
+	}
+
+	var ignore *regexp.Regexp
+	if config.AutoexpandIgnore != "" {
+		ignore, err = regexp.Compile(config.AutoexpandIgnore)
+		if err != nil {
+			panic(err)
+		}
+	}
+	if err := state.AutoExpand(config.AutoexpandDepth, ignore); err != nil {
+		panic(err)
 	}
 	if config.LocatePath != "" {
 		err = state.LocatePath(config.LocatePath)
