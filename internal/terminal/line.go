@@ -4,6 +4,7 @@ import (
 	"golang.org/x/text/width"
 	"regexp"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -36,18 +37,18 @@ func (l *line) appendText(s string) {
 	for len(s) > 0 && l.length < l.maxLength {
 		r, size := utf8.DecodeRuneInString(s)
 		s = s[size:]
-		if r == utf8.RuneError || r <= 0x1f || (r >= 0x7f && r <= 0x9f) {
+		if r == utf8.RuneError || unicode.IsMark(r) || unicode.IsControl(r) {
 			continue
 		}
+		termWidth := 1
 		runeKind := width.LookupRune(r).Kind()
-		if runeKind == width.Neutral || runeKind == width.EastAsianNarrow {
-			l.length += 1
+		if runeKind == width.EastAsianWide || runeKind == width.EastAsianFullwidth {
+			termWidth = 2
+		}
+		if l.length+termWidth <= l.maxLength {
+			l.length += termWidth
 		} else {
-			if l.length+2 <= l.maxLength {
-				l.length += 2
-			} else {
-				break
-			}
+			break
 		}
 		l.line.WriteString(string(r))
 	}
