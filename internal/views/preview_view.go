@@ -76,7 +76,8 @@ func (v *previewView) Render(p term.Position) []term.Line {
 }
 
 func getPreview(cmdTemplate string, path string) (string, error) {
-	cmd := strings.ReplaceAll(cmdTemplate, "{}", path)
+	escapedPath := "\"" + strings.ReplaceAll(path, "\"", "\\\"") + "\""
+	cmd := strings.ReplaceAll(cmdTemplate, "{}", escapedPath)
 	var stdout, stderr strings.Builder
 	preview := exec.Command("bash", "-c", cmd)
 	preview.Stdout = &stdout
