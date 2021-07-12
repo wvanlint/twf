@@ -37,7 +37,7 @@ func init() {
 		"del":               &term.Event{Symbol: term.Del},
 	}
 	for i := 0; i < 26; i++ {
-		strToEventM["ctrl-"+string('a'+i)] = &term.Event{Symbol: term.EventSymbol(term.CtrlA + i)}
+		strToEventM["ctrl-"+string(rune('a'+i))] = &term.Event{Symbol: term.EventSymbol(term.CtrlA + i)}
 	}
 	eventHashKeyToStrM = make(map[string]string)
 	for str, event := range strToEventM {
