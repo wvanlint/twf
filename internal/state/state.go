@@ -30,7 +30,7 @@ func (s *State) LocatePath(path string) error {
 }
 
 func (s *State) AutoExpand(maxDepth int, ignore *regexp.Regexp) error {
-	return s.Root.Traverse(false, nil, func(tree *filetree.FileTree, depth int) error {
+	return s.Root.Traverse(true, nil, func(tree *filetree.FileTree, depth int) error {
 		if maxDepth >= 0 && depth >= maxDepth {
 			return nil
 		}
