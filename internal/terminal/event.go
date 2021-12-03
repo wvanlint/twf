@@ -47,8 +47,6 @@ const (
 	Down
 	Left
 	Right
-	Home
-	End
 
 	ShiftUp
 	ShiftDown
@@ -59,6 +57,11 @@ const (
 	CtrlDown
 	CtrlLeft
 	CtrlRight
+
+	Home
+	End
+	PgUp
+	PgDown
 
 	Rune
 )
@@ -136,6 +139,12 @@ func readEvents(r io.Reader, out chan Event, next chan bool) {
 					in = in[4:]
 				case hasPrefix(in, []byte{27, 91, 52, 126}):
 					out <- Event{Symbol: End}
+					in = in[4:]
+				case hasPrefix(in, []byte{27, 91, 53, 126}):
+					out <- Event{Symbol: PgUp}
+					in = in[4:]
+				case hasPrefix(in, []byte{27, 91, 54, 126}):
+					out <- Event{Symbol: PgDown}
 					in = in[4:]
 				case hasPrefix(in, []byte{27, 91, 49, 59, 50, 65}):
 					out <- Event{Symbol: ShiftUp}
